@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Ecommerce hero">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#2563eb" offset="0%"/>
+      <stop stop-color="#7c3aed" offset="50%"/>
+      <stop stop-color="#0ea5e9" offset="100%"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#ffffff20" offset="0%"/>
+      <stop stop-color="#ffffff05" offset="100%"/>
+    </linearGradient>
+    <filter id="blur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="60" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#g)"/>
+  <g filter="url(#blur)">
+    <circle cx="250" cy="200" r="140" fill="#ffffff10"/>
+    <circle cx="980" cy="180" r="110" fill="#ffffff12"/>
+    <circle cx="1050" cy="600" r="160" fill="#ffffff08"/>
+    <circle cx="200" cy="620" r="120" fill="#ffffff07"/>
+  </g>
+  <g>
+    <rect x="260" y="170" rx="28" ry="28" width="680" height="460" fill="url(#panel)" stroke="#ffffff30" stroke-width="2"/>
+    <text x="600" y="320" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="88" fill="#ffffff" font-weight="700" letter-spacing="2">ALX</text>
+    <text x="600" y="400" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="54" fill="#f1f5f9" font-weight="600" letter-spacing="4">ECOMMERCE</text>
+    <text x="600" y="470" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="26" fill="#e2e8f0" font-weight="400" letter-spacing="1">Shop Smarter • Fast Delivery • Secure Checkout</text>
+  </g>
+  <g stroke="#ffffff50" stroke-width="2" stroke-linecap="round">
+    <path d="M430 540h340"/>
+    <path d="M470 570h260"/>
+  </g>
+  <g fill="#ffffff15">
+    <rect x="370" y="355" width="90" height="120" rx="14"/>
+    <rect x="505" y="355" width="90" height="120" rx="14"/>
+    <rect x="640" y="355" width="90" height="120" rx="14"/>
+  </g>
+</svg>

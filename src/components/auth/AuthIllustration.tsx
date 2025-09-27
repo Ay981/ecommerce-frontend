@@ -11,7 +11,7 @@ export function AuthIllustration({ alt = 'E-commerce illustration', className }:
     <div className={"rounded-xl overflow-hidden bg-muted/20 dark:bg-white/5 p-0 " + (className||'')}>      
       <div className="relative aspect-[4/3] w-full">
         <Image 
-          src="/auth/ecommerce-hero.jpg" 
+          src="/auth/ecommerce-hero.svg" 
           alt={alt}
           fill
           priority
