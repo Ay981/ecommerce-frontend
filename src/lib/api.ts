@@ -8,14 +8,17 @@ import {
   mockOrders,
 } from './mockData'
 
+// Backend currently returns only { email, username } on register and decodes user_id from JWT on login.
+// Make non‑returned profile fields optional so UI isn’t forced to fabricate empty strings.
 export interface User {
   id: string
   email: string
-  first_name: string
-  last_name: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
+  username?: string
+  first_name?: string
+  last_name?: string
+  is_active?: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export interface LoginRequest {
@@ -42,11 +45,13 @@ export interface AuthResponse {
 }
 
 export interface Category {
+  // OpenAPI: id (int), name, slug, description. Mock layer previously added timestamps.
   id: string
   name: string
-  description: string
-  created_at: string
-  updated_at: string
+  slug?: string
+  description?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Product {
@@ -85,7 +90,9 @@ export interface CartResponse {
 export interface Order {
   id: string
   user_id: string
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  // Backend enum: pending | success | failed. Map later if you introduce richer lifecycle.
+  status: 'pending' | 'success' | 'failed'
+  // Frontend canonical total; backend field is total_price (translate when wiring real endpoint)
   total_amount: number
   shipping_address: string
   created_at: string
@@ -116,12 +123,17 @@ export interface CreateOrderRequest {
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
 // IMPORTANT: Provide NEXT_PUBLIC_API_BASE_URL in your .env.* (see .env.example). Fallback keeps local dev functional.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '')
+const USE_API_PROXY = process.env.NEXT_PUBLIC_USE_API_PROXY === 'true'
+
+if (process.env.NODE_ENV === 'development') {
+  console.info('[API CONFIG]', { USE_MOCKS, API_BASE_URL, USE_API_PROXY })
+}
 
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: USE_MOCKS
-    ? async (args: string | FetchArgs) => {
+  ? async (args: string | FetchArgs) => {
         // Normalize args from string or object
         let url = ''
         let method: string = 'GET'
@@ -336,9 +348,11 @@ export const api = createApi({
         }
         return { error: { status: 404, data: 'Not found (mock)' } }
       }
-    : fetchBaseQuery({
-        baseUrl: `${API_BASE_URL}/api/v1`,
-        prepareHeaders: (headers, { getState, endpoint }) => {
+    : ((() => {
+  // Simple exponential backoff retry wrapper around fetchBaseQuery for transient network (FETCH_ERROR) cases
+  const rawBase = fetchBaseQuery({
+          baseUrl: USE_API_PROXY ? '/api/proxy/api/v1' : `${API_BASE_URL}/api/v1`,
+          prepareHeaders: (headers, { getState, endpoint }) => {
           const publicNoAuthEndpoints = ['login','register','refreshToken']
           const publicReadEndpoints = ['getProducts','getProduct','getCategories','getCategory']
           if (endpoint && (publicNoAuthEndpoints.includes(endpoint))) return headers
@@ -360,8 +374,45 @@ export const api = createApi({
           }
           headers.set('authorization', `Bearer ${token}`)
           return headers
-        },
-      }),
+          },
+        })
+        // Return wrapped baseQuery function with logging
+  return async (args: string | FetchArgs, apiCtx: Parameters<typeof rawBase>[1], extraOpts: Parameters<typeof rawBase>[2]) => {
+          if (process.env.NODE_ENV === 'development') {
+            const url = typeof args === 'string' ? args : (args as FetchArgs).url
+            // Log before request to verify constructed relative URL (full = baseUrl + this path)
+            console.debug('[API REQ]', url)
+          }
+          const maxRetries = 2
+          let attempt = 0
+          let result = await rawBase(args, apiCtx, extraOpts)
+          while (result.error && (result.error as { status?: unknown }).status === 'FETCH_ERROR' && attempt < maxRetries) {
+            attempt++
+            const delay = 250 * Math.pow(2, attempt - 1) // 250ms, 500ms
+            await new Promise(r => setTimeout(r, delay))
+            if (process.env.NODE_ENV === 'development') {
+              const url = typeof args === 'string' ? args : (args as FetchArgs).url
+              console.debug(`[API RETRY ${attempt}]`, url)
+            }
+            result = await rawBase(args, apiCtx, extraOpts)
+          }
+          // (Removed complex automatic fallback logic for clarity and stability.)
+          if (result.error && process.env.NODE_ENV === 'development') {
+            const url = typeof args === 'string' ? args : (args as FetchArgs).url
+            const errObj = result.error as unknown as { status?: unknown; data?: unknown; error?: unknown }
+            const status = errObj?.status
+            const data = errObj?.data
+            const errStr = errObj?.error
+            console.groupCollapsed(`%c[API ERROR] ${url}`,'color:#f87171;font-weight:bold;')
+            console.log('Status:', status)
+            if (data !== undefined) console.log('Data:', data)
+            if (errStr) console.log('Error:', errStr)
+            console.log('Raw error object:', errObj)
+            console.groupEnd()
+          }
+          return result
+        }
+      })()),
   tagTypes: ['User', 'Category', 'Product', 'Order', 'Cart'],
   endpoints: (builder) => ({
     // Auth endpoints
@@ -429,7 +480,8 @@ export const api = createApi({
     }),
     refreshToken: builder.mutation<{ access_token: string; token_type: string }, { refresh: string }>({
       query: (body) => ({
-        url: '/auth/token/refresh',
+  // Trailing slash required by DRF default router
+  url: '/auth/token/refresh/',
         method: 'POST',
         body,
       }),
@@ -482,12 +534,14 @@ export const api = createApi({
   getProducts: builder.query<{ results: Product[]; count: number; page: number; page_size: number }, { categoryId?: string; search?: string; page?: number; pageSize?: number }>({
       query: ({ categoryId, search, page = 1, pageSize = 12 }) => {
         const params = new URLSearchParams()
-        // Backend filter expects 'category' (slug). Our mock used category_id. Support both via env flag.
         const useMocks = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
+        // OpenAPI spec: /shop/products/ accepts query params: category (slug), page, search
+        // We previously sent page_size which backend does not advertise; removing to avoid potential 500s.
         if (categoryId) params.append(useMocks ? 'category_id' : 'category', categoryId)
         if (search) params.append('search', search)
         params.append('page', String(page))
-        params.append('page_size', String(pageSize))
+        // Retain pageSize only for mock pagination simulation (do NOT send to real backend)
+        if (useMocks) params.append('page_size', String(pageSize))
         return useMocks ? `/products?${params.toString()}` : `/shop/products/?${params.toString()}`
       },
       // Transform backend response to ensure products have stock_quantity
@@ -521,6 +575,7 @@ export const api = createApi({
           }
         }
         if (Array.isArray(response)) {
+          // Mock mode (non-paginated array) => fabricate pagination meta
           return { results: response.map(normalize), count: response.length, page: 1, page_size: response.length }
         }
         if (response && typeof response === 'object' && 'results' in response) {
@@ -530,6 +585,7 @@ export const api = createApi({
             return {
               results,
               count: typeof obj.count === 'number' ? obj.count : results.length,
+              // DRF default PageNumberPagination returns 'count', 'next', 'previous', 'results' (no page/page_size); we infer.
               page: typeof obj.page === 'number' ? obj.page : 1,
               page_size: typeof obj.page_size === 'number' ? obj.page_size : results.length,
             }
@@ -592,10 +648,68 @@ export const api = createApi({
     // Orders endpoints
     getOrders: builder.query<Order[], void>({
       query: () => '/orders',
+      transformResponse: (resp: unknown): Order[] => {
+        interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
+        interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
+        const mapStatus = (s: unknown): Order['status'] => {
+          if (s === 'pending' || s === 'success' || s === 'failed') return s
+          // Map any legacy / mock extended statuses back if encountered
+          if (s === 'processing') return 'pending'
+          if (s === 'shipped' || s === 'delivered') return 'success'
+          if (s === 'cancelled') return 'failed'
+          return 'pending'
+        }
+        const mapOrder = (o: RawOrder): Order => {
+          const itemsRaw = Array.isArray(o.items) ? (o.items as RawOrderItem[]) : []
+          return {
+            id: String(o.id ?? ''),
+            user_id: String(o.user_id ?? o.user ?? ''),
+            status: mapStatus(o.status),
+            total_amount: typeof o.total_amount === 'number' ? o.total_amount as number : Number(o.total_price ?? 0),
+            shipping_address: String(o.shipping_address ?? ''),
+            created_at: String(o.created_at ?? ''),
+            updated_at: String(o.updated_at ?? ''),
+            items: itemsRaw.map(it => ({
+              id: String(it.id ?? ''),
+              order_id: String(it.order_id ?? o.id ?? ''),
+              product_id: String(it.product_id ?? ((it.product as { id?: unknown }|undefined)?.id) ?? ''),
+              quantity: Number(it.quantity ?? 0),
+              price: Number(it.price ?? 0),
+              product: (it.product ?? {}) as Product,
+            })),
+          }
+        }
+        if (Array.isArray(resp)) return (resp as RawOrder[]).map(mapOrder)
+        return []
+      },
       providesTags: ['Order'],
     }),
     getOrder: builder.query<Order, string>({
       query: (id) => `/orders/${id}`,
+      transformResponse: (o: unknown): Order => {
+        interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
+        interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
+        const raw = (Array.isArray(o) ? o[0] : o) as RawOrder
+        const status = raw.status
+        const itemsRaw = Array.isArray(raw.items) ? (raw.items as RawOrderItem[]) : []
+        return {
+          id: String(raw.id ?? ''),
+          user_id: String(raw.user_id ?? raw.user ?? ''),
+          status: (status === 'pending' || status === 'success' || status === 'failed') ? status : 'pending',
+          total_amount: typeof raw.total_amount === 'number' ? raw.total_amount as number : Number(raw.total_price ?? 0),
+          shipping_address: String(raw.shipping_address ?? ''),
+          created_at: String(raw.created_at ?? ''),
+          updated_at: String(raw.updated_at ?? ''),
+          items: itemsRaw.map(it => ({
+            id: String(it.id ?? ''),
+            order_id: String(it.order_id ?? raw.id ?? ''),
+            product_id: String(it.product_id ?? ((it.product as { id?: unknown }|undefined)?.id) ?? ''),
+            quantity: Number(it.quantity ?? 0),
+            price: Number(it.price ?? 0),
+            product: (it.product ?? {}) as Product,
+          })),
+        }
+      },
       providesTags: (result, error, id) => [{ type: 'Order', id }],
     }),
     createOrder: builder.mutation<Order, CreateOrderRequest>({
@@ -604,6 +718,29 @@ export const api = createApi({
         method: 'POST',
         body: orderData,
       }),
+      transformResponse: (o: unknown): Order => {
+        interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
+        interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
+        const raw = o as RawOrder
+        const itemsRaw = Array.isArray(raw.items) ? (raw.items as RawOrderItem[]) : []
+        return {
+          id: String(raw.id ?? ''),
+          user_id: String(raw.user_id ?? raw.user ?? ''),
+          status: (raw.status === 'pending' || raw.status === 'success' || raw.status === 'failed') ? raw.status : 'pending',
+          total_amount: typeof raw.total_amount === 'number' ? raw.total_amount as number : Number(raw.total_price ?? 0),
+          shipping_address: String(raw.shipping_address ?? ''),
+          created_at: String(raw.created_at ?? ''),
+          updated_at: String(raw.updated_at ?? ''),
+          items: itemsRaw.map(it => ({
+            id: String(it.id ?? ''),
+            order_id: String(it.order_id ?? raw.id ?? ''),
+            product_id: String(it.product_id ?? ((it.product as { id?: unknown }|undefined)?.id) ?? ''),
+            quantity: Number(it.quantity ?? 0),
+            price: Number(it.price ?? 0),
+            product: (it.product ?? {}) as Product,
+          })),
+        }
+      },
       invalidatesTags: ['Order'],
     }),
 

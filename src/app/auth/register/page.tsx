@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAppDispatch } from '@/lib/hooks'
-import { useRegisterMutation } from '@/lib/api'
+import { useRegisterMutation, useLoginMutation } from '@/lib/api'
 import { setCredentials } from '@/lib/features/auth/authSlice'
 import Layout from '@/components/layout/Layout'
 import { AuthIllustration } from '@/components/auth/AuthIllustration'
@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const [registerMutation, { isLoading }] = useRegisterMutation()
+  const [loginMutation] = useLoginMutation()
   const { addToast } = useToast()
   
   const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
@@ -38,15 +39,33 @@ export default function RegisterPage() {
       const result = await registerMutation(formData).unwrap()
       if (result.access_token) {
         // Mock path gives token immediately
-        dispatch(setCredentials({ user: result.user, token: result.access_token }))
+        dispatch(setCredentials({ user: result.user, token: result.access_token, refreshToken: result.refresh_token }))
         addToast({ variant: 'success', title: 'Account created', message: 'Welcome! You are now signed in.' })
         router.push('/')
-      } else {
-        // Real backend: redirect to login
+        return
+      }
+      // Attempt automatic login against real backend (backend returns no tokens on register)
+      try {
+        const loginResp = await loginMutation({ email: formData.email, password: formData.password }).unwrap()
+        if (loginResp.access_token) {
+          dispatch(setCredentials({ user: loginResp.user, token: loginResp.access_token, refreshToken: loginResp.refresh_token }))
+          addToast({ variant: 'success', title: 'Account created', message: 'Signed in automatically.' })
+          router.push('/')
+          return
+        }
+        // If login gave no token fallback to manual login route
+        addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
+        router.push('/auth/login')
+      } catch {
         addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
         router.push('/auth/login')
       }
     } catch (err) {
+      // If backend returns 500 (server error) give clearer guidance
+      if (err && typeof err === 'object' && 'status' in err && (err as { status: unknown }).status === 500) {
+        setError('Server error during registration (HTTP 500). The backend is failing internally – likely pending migrations or a database issue. Try again later or contact support.')
+        return
+      }
       const norm = normalizeAuthError(err)
       if (norm.global) setError(norm.global)
       if (norm.fieldErrors) setFieldErrors(renderFieldErrors(norm.fieldErrors))

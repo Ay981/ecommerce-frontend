@@ -35,8 +35,23 @@ export function normalizeAuthError(raw: unknown): NormalizedError {
   const rawObj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : undefined
   const status = rawObj?.status as number | string | undefined
   const data = (rawObj?.data as Record<string, unknown> | undefined)
+  // Detect proxy/front-end 404 HTML returned instead of JSON (misconfigured proxy or dev server not restarted)
+  if (status === 'PARSING_ERROR' && typeof data === 'string' && /<!DOCTYPE html>/i.test(data)) {
+    return { global: 'Unexpected HTML response (likely local proxy/route 404). Restart dev server so /api/proxy route is registered or disable proxy flag.' }
+  }
+  // Generic parsing error (often backend returned HTML 500 or non-JSON error page)
+  if (status === 'PARSING_ERROR') {
+    return { global: 'Server returned an unexpected (non-JSON) response. This usually means the backend errored (500) and sent an HTML error page. Check backend logs / migrations.' }
+  }
 
-  if (status === 'FETCH_ERROR') return { global: 'Network error. Check your connection and retry.' }
+  if (status === 'FETCH_ERROR') {
+    // Attempt to infer a more specific cause from embedded error string if present
+    const errText = typeof (rawObj?.error as unknown) === 'string' ? String(rawObj?.error) : ''
+    if (/dns|ENOTFOUND|NameResolution/i.test(errText)) return { global: 'Cannot reach server (DNS resolution failed). Check the API URL.' }
+    if (/failed to fetch|TypeError: NetworkError/i.test(errText)) return { global: 'Connection failed before reaching the server. Possible CORS, mixed content (http vs https), or temporary network issue.' }
+    if (/timeout/i.test(errText)) return { global: 'Request timed out contacting the server. Please retry.' }
+    return { global: 'Network issue prevented the request. Please check your connection and retry.' }
+  }
   if (status === 500) return { global: 'Server error. Please try again shortly.' }
 
   if (data && typeof data === 'object') {
