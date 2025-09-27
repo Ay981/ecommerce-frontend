@@ -10,6 +10,7 @@ import Layout from '@/components/layout/Layout'
 import { AuthIllustration } from '@/components/auth/AuthIllustration'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/providers/ToastProvider'
+import { normalizeAuthError, renderFieldErrors } from '@/lib/errors'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -26,10 +27,12 @@ export default function RegisterPage() {
     username: '',
   })
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Array<{fieldLabel:string; message:string}>>([])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+  setError('')
+  setFieldErrors([])
 
     try {
       const result = await registerMutation(formData).unwrap()
@@ -44,27 +47,9 @@ export default function RegisterPage() {
         router.push('/auth/login')
       }
     } catch (err) {
-      // Try to extract DRF-style validation errors
-      let message = 'Registration failed'
-      const data = (err as { data?: unknown })?.data as Record<string, unknown> | undefined
-      if (data) {
-        if (typeof data.detail === 'string') {
-          message = data.detail
-        } else {
-          // Collect first message for each field
-            const parts: string[] = []
-            for (const [field, val] of Object.entries(data)) {
-              if (field === 'detail') continue
-              if (Array.isArray(val) && val.length) {
-                parts.push(`${field}: ${val[0]}`)
-              } else if (typeof val === 'string') {
-                parts.push(`${field}: ${val}`)
-              }
-            }
-            if (parts.length) message = parts.join(' | ')
-        }
-      }
-      setError(message)
+      const norm = normalizeAuthError(err)
+      if (norm.global) setError(norm.global)
+      if (norm.fieldErrors) setFieldErrors(renderFieldErrors(norm.fieldErrors))
     }
   }
 
@@ -89,9 +74,22 @@ export default function RegisterPage() {
             <h1 className="text-3xl font-bold mb-2">Create an account</h1>
             <p className="text-muted-foreground mb-8">Enter your details below</p>
 
-            {error && (
-              <div className="mb-6 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
-                {error}
+            {(error || fieldErrors.length > 0) && (
+              <div className="mb-6 space-y-2">
+                {error && (
+                  <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
+                    {error}
+                  </div>
+                )}
+                {fieldErrors.length > 0 && (
+                  <ul className="rounded-md border border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/40 divide-y">
+                    {fieldErrors.map(fe => (
+                      <li key={fe.fieldLabel} className="px-4 py-2 text-xs text-red-700 dark:text-red-300">
+                        <span className="font-medium">{fe.fieldLabel}:</span> {fe.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 

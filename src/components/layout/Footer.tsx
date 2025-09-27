@@ -3,7 +3,7 @@ import Link from 'next/link'
 export default function Footer() {
   return (
     <footer className="border-t mt-16">
-      <div className="container mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-4 gap-10 text-sm">
+  <div className="container mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-3 gap-10 text-sm">
         {/* Brand/Subscribe */}
         <div>
           <div className="flex items-center space-x-2 mb-4">
@@ -41,18 +41,7 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* Download App */}
-        <div>
-          <h4 className="font-semibold mb-4">Download App</h4>
-          <p className="text-muted-foreground mb-3">Save $3 with App New User Only</p>
-          <div className="flex gap-3">
-            <div className="h-20 w-20 bg-muted grid place-items-center text-xs rounded">QR</div>
-            <div className="flex flex-col gap-2">
-              <a href="#" className="h-9 w-28 rounded bg-black text-white grid place-items-center text-xs">Google Play</a>
-              <a href="#" className="h-9 w-28 rounded bg-black text-white grid place-items-center text-xs">App Store</a>
-            </div>
-          </div>
-        </div>
+  {/* (Download App section removed) */}
       </div>
       <div className="border-t py-4 text-xs text-muted-foreground text-center">© {new Date().getFullYear()} Exclusive. All rights reserved.</div>
     </footer>
