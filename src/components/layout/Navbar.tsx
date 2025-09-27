@@ -59,7 +59,7 @@ export default function Navbar() {
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">E</span>
               </div>
-              <span className="text-xl font-bold text-gradient">E-Commerce</span>
+              <span className="text-xl font-bold text-gradient">ALX Ecommerce</span>
             </Link>
 
             {/* Desktop Navigation */}

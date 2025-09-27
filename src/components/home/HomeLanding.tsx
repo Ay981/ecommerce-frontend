@@ -64,7 +64,7 @@ export default function HomeLanding() {
             <div className="max-w-3xl mx-auto text-center">
               <div className="inline-flex items-center rounded-full bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur-md mb-6">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Welcome to E-Commerce Store
+                Welcome to ALX Ecommerce
               </div>
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
                 Discover Amazing

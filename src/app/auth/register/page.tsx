@@ -7,6 +7,7 @@ import { useAppDispatch } from '@/lib/hooks'
 import { useRegisterMutation } from '@/lib/api'
 import { setCredentials } from '@/lib/features/auth/authSlice'
 import Layout from '@/components/layout/Layout'
+import { AuthIllustration } from '@/components/auth/AuthIllustration'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/providers/ToastProvider'
 
@@ -80,11 +81,7 @@ export default function RegisterPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           {/* Left Illustration */}
           <div className="hidden md:block">
-            <div className="rounded-xl bg-gradient-to-b from-sky-100 to-sky-200 dark:from-slate-800 dark:to-slate-900 p-8">
-              <div className="aspect-[4/3] rounded-lg bg-white/60 dark:bg-white/5 grid place-items-center">
-                <div className="text-7xl">📱</div>
-              </div>
-            </div>
+            <AuthIllustration />
           </div>
 
           {/* Right Form */}

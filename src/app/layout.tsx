@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "E-Commerce Store",
-  description: "Modern e-commerce platform built with Next.js and Redux",
+  title: "ALX Ecommerce",
+  description: "ALX Ecommerce platform built with Next.js and Redux",
 };
 
 export default function RootLayout({
