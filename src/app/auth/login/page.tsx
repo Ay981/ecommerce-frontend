@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAppDispatch } from '@/lib/hooks'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { useLoginMutation } from '@/lib/api'
 import { setCredentials } from '@/lib/features/auth/authSlice'
+import { useAddToCartMutation } from '@/lib/api'
 import Layout from '@/components/layout/Layout'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +15,8 @@ export default function LoginPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const [loginMutation, { isLoading }] = useLoginMutation()
+  const [addToCart] = useAddToCartMutation()
+  const localCartItems = useAppSelector(s => s.cart.items)
   const { addToast } = useToast()
   
   const [formData, setFormData] = useState({
@@ -29,7 +32,13 @@ export default function LoginPage() {
 
     try {
       const result = await loginMutation(formData).unwrap()
-      dispatch(setCredentials({ user: result.user, token: result.access_token }))
+      dispatch(setCredentials({ user: result.user, token: result.access_token, refreshToken: result.refresh_token }))
+      // Attempt merge: sequentially add each local cart item to server cart
+      for (const item of localCartItems) {
+        try {
+          await addToCart({ product_id: item.product.id, quantity: item.quantity }).unwrap()
+        } catch {/* ignore individual failures */}
+      }
       addToast({ variant: 'success', title: 'Welcome back', message: 'You are now logged in.' })
       router.push('/')
     } catch (err) {

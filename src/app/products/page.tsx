@@ -63,6 +63,11 @@ export default function ProductsPage() {
   }
 
   if (productsError) {
+    // Try to auto-correct invalid page error from DRF
+  const errData = (productsError as { data?: unknown })?.data as Record<string, unknown> | undefined
+  if (errData && typeof errData.detail === 'string' && errData.detail.toLowerCase().includes('invalid page')) {
+      if (page !== 1) setPage(1)
+    }
     return (
       <Layout>
         <div className="text-center text-red-600">
@@ -117,8 +122,14 @@ export default function ProductsPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {productResp?.results.map((product) => (
+        {(() => {
+          // Normalize response: support both old array shape and new paginated object
+          const products: Product[] = Array.isArray(productResp)
+            ? productResp as unknown as Product[]
+            : (productResp?.results ?? [])
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {products.map((product) => (
             <div key={product.id} className="bg-card rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border">
               <Link href={`/products/${product.id}`}>
                 <div className="aspect-w-1 aspect-h-1 bg-muted">
@@ -157,17 +168,19 @@ export default function ProductsPage() {
                 </Button>
               </div>
             </div>
-          ))}
-        </div>
+              ))}
+            </div>
+          )
+        })()}
 
-        {productResp && productResp.results.length === 0 && (
+        {(!productResp || (Array.isArray(productResp) ? (productResp as unknown as Product[]).length === 0 : (productResp.results ?? []).length === 0)) && (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg">No products found.</p>
           </div>
         )}
 
         {/* Pagination */}
-        {productResp && productResp.count > pageSize && (
+        {(!Array.isArray(productResp)) && productResp && productResp.count > pageSize && (
           <div className="flex items-center justify-center gap-4 mt-10">
             <Button
               variant="outline"

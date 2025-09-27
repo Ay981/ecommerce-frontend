@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { useCreateOrderMutation, useGetCartQuery } from '@/lib/api'
@@ -32,11 +32,23 @@ export default function CheckoutPage() {
   const [couponApplied, setCouponApplied] = useState(false)
   const [error, setError] = useState('')
 
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    router.push('/auth/login')
-    return null
-  }
+  // Redirect effects (avoid calling router during render)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/auth/login')
+    }
+  }, [isAuthenticated, router])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (localItems.length === 0) router.replace('/cart')
+      return
+    }
+    // authenticated path: wait for serverCart to load
+    if (serverCart && serverCart.items.length === 0) {
+      router.replace('/cart')
+    }
+  }, [isAuthenticated, localItems.length, serverCart, router])
 
   const effectiveItems = isAuthenticated
     ? (serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || [])
@@ -45,10 +57,13 @@ export default function CheckoutPage() {
     ? (serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0)
     : localTotal
 
-  // Redirect to cart if empty (after server cart load if authenticated)
-  if (effectiveItems.length === 0 && (!isAuthenticated || serverCart)) {
-    router.push('/cart')
-    return null
+  // While deciding redirects, suppress full UI
+  if (!isAuthenticated || (effectiveItems.length === 0 && (!isAuthenticated || serverCart))) {
+    return (
+      <Layout>
+        <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Redirecting...</div>
+      </Layout>
+    )
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

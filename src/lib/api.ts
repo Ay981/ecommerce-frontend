@@ -26,14 +26,19 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string
   password: string
-  first_name: string
-  last_name: string
+  // Mock mode extra profile fields (ignored by backend)
+  first_name?: string
+  last_name?: string
+  // Backend requirement (username) – optional for caller; will be derived from email prefix if absent
+  username?: string
 }
 
+// Auth response (mock shape). When integrating real backend (SimpleJWT), you'll map {access, refresh} to this in the component layer.
 export interface AuthResponse {
   access_token: string
   token_type: string
-  user: User
+  user?: User // optional for future real backend profile fetch
+  refresh_token?: string
 }
 
 export interface Category {
@@ -49,9 +54,11 @@ export interface Product {
   name: string
   description: string
   price: number
+  // Frontend canonical field; when using backend we map backend 'stock' -> stock_quantity
   stock_quantity: number
+  // Canonical foreign key id (mock). Backend presently returns category name / nested; mapping step can fill id if available later.
   category_id: string
-  category?: Category
+  category?: Category | { id?: string; name?: string; slug?: string }
   created_at: string
   updated_at: string
 }
@@ -166,7 +173,9 @@ export const api = createApi({
         }
         if (urlNoTrailQ.startsWith('/categories/')) {
           const id = urlNoTrailQ.split('/').pop()
-          return { data: mockCategories.find((c) => c.id === id) }
+            const cat = mockCategories.find((c) => c.id === id)
+            if (!cat) return { error: { status: 404, data: 'Category not found' } }
+            return { data: cat }
         }
         // Products
         if (urlNoTrailQ.startsWith('/products')) {
@@ -181,21 +190,55 @@ export const api = createApi({
           }
           if (/^\/products(\/?|\?.*)?$/.test(url)) return { data: filtered }
           const id = urlNoTrailQ.split('/').pop()
-          return { data: mockProducts.find((p) => p.id === id) }
+          const prod = mockProducts.find((p) => p.id === id)
+          if (!prod) return { error: { status: 404, data: 'Product not found' } }
+          return { data: prod }
         }
-        // Orders
+        // Orders (mock, in‑memory persistence)
+        // @ts-expect-error initialize global mock orders store if missing
+        globalThis.__mockOrders = globalThis.__mockOrders || [...mockOrders]
+        // @ts-expect-error read global mock orders
+        let mockOrdersStore: Order[] = globalThis.__mockOrders
         if (urlNoTrailQ === '/orders' && method === 'POST') {
-          // Clear mock cart on order
-          // @ts-expect-error - mutate global mock cart
+          // @ts-expect-error read cart items snapshot before clearing
+          const cartItems: ServerCartItem[] = (globalThis.__mockCart.items as ServerCartItem[]).map(it => ({ ...it, product: { ...it.product } }))
+          const orderId = 'order_' + Math.random().toString(36).slice(2)
+          const orderItems = cartItems.map(ci => ({
+            id: 'oi_' + Math.random().toString(36).slice(2),
+            order_id: orderId,
+            product_id: ci.product_id,
+            quantity: ci.quantity,
+            price: ci.product.price,
+            product: ci.product,
+          }))
+          const total = orderItems.reduce((s, it) => s + it.price * it.quantity, 0)
+          const now = new Date().toISOString()
+          const newOrder: Order = {
+            id: orderId,
+            user_id: 'user_mock',
+            status: 'processing',
+            total_amount: total,
+            shipping_address: 'Mock Address\nPhone: 000\nEmail: mock@example.com',
+            created_at: now,
+            updated_at: now,
+            items: orderItems,
+          }
+          mockOrdersStore = [newOrder, ...mockOrdersStore]
+          // @ts-expect-error write updated orders store
+          globalThis.__mockOrders = mockOrdersStore
+          // Clear cart
+          // @ts-expect-error mutate mock cart clearing after snapshot
           globalThis.__mockCart.items = []
-          return { data: { ...mockOrders[0], id: 'order' + Math.random().toString(36).slice(2) } }
+          return { data: newOrder }
         }
         if (urlNoTrailQ === '/orders') {
-          return { data: mockOrders }
+          return { data: mockOrdersStore }
         }
         if (urlNoTrailQ.startsWith('/orders/')) {
           const id = urlNoTrailQ.split('/').pop()
-          return { data: mockOrders.find((o) => o.id === id) }
+          const ord = mockOrdersStore.find((o) => o.id === id)
+          if (!ord) return { error: { status: 404, data: 'Order not found' } }
+          return { data: ord }
         }
 
         // Cart endpoints (mock)
@@ -209,21 +252,38 @@ export const api = createApi({
             const body = args.body as { product_id: string; quantity?: number }
             const prod = mockProducts.find((p) => p.id === body.product_id)
             if (!prod) return { error: { status: 400, data: 'Product not found' } }
-            // @ts-expect-error - read items from mock cart
-            const items: ServerCartItem[] = globalThis.__mockCart.items
-            let item = items.find((it) => it.product_id === body.product_id)
-            if (item) {
-              item.quantity += body.quantity ?? 1
+            // @ts-expect-error reading custom global mock cart items
+            let items: ServerCartItem[] = globalThis.__mockCart.items
+            // If items array was frozen by RTK dev checks, clone it before mutating
+            if (Object.isFrozen(items)) {
+              items = [...items]
+            }
+            const addQty = body.quantity ?? 1
+            const existingIndex = items.findIndex((it) => it.product_id === body.product_id)
+            if (existingIndex >= 0) {
+              // Build new array with updated quantity (avoid mutating possibly frozen object)
+              items = items.map((it, i) => i === existingIndex ? { ...it, quantity: it.quantity + addQty } : it)
             } else {
-              item = {
+              const newItem: ServerCartItem = {
                 id: 'ci_' + Math.random().toString(36).slice(2),
                 product_id: prod.id,
-                quantity: body.quantity ?? 1,
+                quantity: addQty,
                 product: prod,
               }
-              items.push(item)
+              items = [...items, newItem]
             }
-            return { data: mockCart }
+            // write back new array
+            // @ts-expect-error - write items to mock cart
+            globalThis.__mockCart.items = items
+            const updatedCart: CartResponse = {
+              // @ts-expect-error accessing custom global mock cart id
+              id: globalThis.__mockCart.id,
+              // @ts-expect-error accessing custom global mock cart items
+              items: globalThis.__mockCart.items,
+              // @ts-expect-error computing total from custom global mock cart items
+              total_amount: (globalThis.__mockCart.items as ServerCartItem[]).reduce((sum, it) => sum + it.product.price * it.quantity, 0),
+            }
+            return { data: updatedCart }
           }
         }
         if (urlNoTrailQ.startsWith('/cart/item/') && method === 'PUT') {
@@ -231,35 +291,73 @@ export const api = createApi({
           if (typeof args === 'object' && args.body) {
             const body = args.body as { quantity: number }
             // @ts-expect-error - read items from mock cart
-            const items: ServerCartItem[] = globalThis.__mockCart.items
-            const item = items.find((it) => it.id === itemId)
-            if (!item) return { error: { status: 404, data: 'Item not found' } }
+            let items: ServerCartItem[] = globalThis.__mockCart.items
+            if (Object.isFrozen(items)) items = [...items]
+            const idx = items.findIndex((it) => it.id === itemId)
+            if (idx === -1) return { error: { status: 404, data: 'Item not found' } }
             if (body.quantity <= 0) {
               // remove
-              // @ts-expect-error - write items to mock cart
+              // @ts-expect-error writing filtered items to global mock cart
               globalThis.__mockCart.items = items.filter((it) => it.id !== itemId)
             } else {
-              item.quantity = body.quantity
+              const updated = { ...items[idx], quantity: body.quantity }
+              items = items.map((it,i)=> i===idx ? updated : it)
+              // @ts-expect-error writing updated items array back to global mock cart
+              globalThis.__mockCart.items = items
             }
-            return { data: mockCart }
+            const updatedCart: CartResponse = {
+              // @ts-expect-error accessing custom global mock cart id
+              id: globalThis.__mockCart.id,
+              // @ts-expect-error accessing custom global mock cart items
+              items: globalThis.__mockCart.items,
+              // @ts-expect-error computing total from custom global mock cart items
+              total_amount: (globalThis.__mockCart.items as ServerCartItem[]).reduce((sum, it) => sum + it.product.price * it.quantity, 0),
+            }
+            return { data: updatedCart }
           }
         }
         if (urlNoTrailQ.startsWith('/cart/item/') && method === 'DELETE') {
           const itemId = urlNoTrailQ.split('/').pop()!
-          // @ts-expect-error - write items to mock cart
-          globalThis.__mockCart.items = globalThis.__mockCart.items.filter((it: ServerCartItem) => it.id !== itemId)
-          return { data: mockCart }
+          // @ts-expect-error reading current items from global mock cart
+          let current: ServerCartItem[] = globalThis.__mockCart.items
+          if (Object.isFrozen(current)) current = [...current]
+          // @ts-expect-error writing filtered deletion result to global mock cart
+          globalThis.__mockCart.items = current.filter((it: ServerCartItem) => it.id !== itemId)
+          const updatedCart: CartResponse = {
+            // @ts-expect-error accessing custom global mock cart id
+            id: globalThis.__mockCart.id,
+            // @ts-expect-error accessing custom global mock cart items
+            items: globalThis.__mockCart.items,
+            // @ts-expect-error computing total from custom global mock cart items
+            total_amount: (globalThis.__mockCart.items as ServerCartItem[]).reduce((sum, it) => sum + it.product.price * it.quantity, 0),
+          }
+          return { data: updatedCart }
         }
         return { error: { status: 404, data: 'Not found (mock)' } }
       }
     : fetchBaseQuery({
         baseUrl: `${API_BASE_URL}/api/v1`,
-        prepareHeaders: (headers, { getState }) => {
-          // Get token from Redux state
-          const token = (getState() as RootState).auth.token
-          if (token) {
-            headers.set('authorization', `Bearer ${token}`)
+        prepareHeaders: (headers, { getState, endpoint }) => {
+          const publicNoAuthEndpoints = ['login','register','refreshToken']
+          const publicReadEndpoints = ['getProducts','getProduct','getCategories','getCategory']
+          if (endpoint && (publicNoAuthEndpoints.includes(endpoint))) return headers
+          const state = (getState() as RootState)
+          const token = state.auth.token
+          if (!token) return headers
+          // Decode JWT exp (best-effort). If invalid or expired, skip.
+          try {
+            const payloadSeg = token.split('.')[1]
+            const json = atob(payloadSeg.replace(/-/g,'+').replace(/_/g,'/'))
+            const payload = JSON.parse(json) as { exp?: number }
+            if (payload.exp && payload.exp * 1000 < Date.now()) {
+              return headers // expired: don't send -> allow anonymous read
+            }
+          } catch { /* ignore decoding errors */ }
+          if (endpoint && publicReadEndpoints.includes(endpoint)) {
+            // Allow unauthenticated caching of public data even if logged in
+            return headers
           }
+          headers.set('authorization', `Bearer ${token}`)
           return headers
         },
       }),
@@ -268,18 +366,64 @@ export const api = createApi({
     // Auth endpoints
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
-        url: '/auth/login',
+        url: USE_MOCKS ? '/auth/login' : '/auth/login/',
         method: 'POST',
         body: credentials,
       }),
+      transformResponse: (resp: unknown): AuthResponse => {
+        type JwtLogin = { access?: unknown; refresh?: unknown; access_token?: unknown; token_type?: unknown; user?: unknown }
+        const r = (resp || {}) as JwtLogin
+        if (typeof r.access_token === 'string') return r as unknown as AuthResponse // mock
+        if (typeof r.access === 'string' && typeof r.refresh === 'string') {
+          // decode user_id if present
+          let user: User | undefined
+          try {
+            const payloadSeg = r.access.split('.')[1]
+            const json = atob(payloadSeg.replace(/-/g, '+').replace(/_/g, '/'))
+            const payload = JSON.parse(json)
+            if (payload.user_id) {
+              user = {
+                id: String(payload.user_id),
+                email: '',
+                first_name: '',
+                last_name: '',
+                is_active: true,
+                created_at: '',
+                updated_at: '',
+              }
+            }
+          } catch {/* ignore */}
+          return { access_token: r.access, refresh_token: r.refresh, token_type: 'bearer', user }
+        }
+        return { access_token: '', token_type: 'bearer' }
+      },
       invalidatesTags: ['User'],
     }),
     register: builder.mutation<AuthResponse, RegisterRequest>({
-      query: (userData) => ({
-        url: '/auth/register',
-        method: 'POST',
-        body: userData,
-      }),
+      query: (userData) => {
+        if (USE_MOCKS) {
+          return {
+            url: '/auth/register',
+            method: 'POST',
+            body: userData,
+          }
+        }
+        // Real backend expects: email, password, username
+        const username = userData.username && userData.username.trim().length > 0
+          ? userData.username.trim()
+          : userData.email.split('@')[0]
+        return {
+          url: '/auth/register/',
+            method: 'POST',
+            body: { email: userData.email, password: userData.password, username },
+        }
+      },
+      transformResponse: (resp: unknown): AuthResponse => {
+        const r = (resp || {}) as { access_token?: unknown }
+        if (typeof r.access_token === 'string') return r as unknown as AuthResponse
+        // backend returns user only; force empty token, UI should redirect to login
+        return { access_token: '', token_type: 'bearer' }
+      },
       invalidatesTags: ['User'],
     }),
     refreshToken: builder.mutation<{ access_token: string; token_type: string }, { refresh: string }>({
@@ -288,6 +432,12 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      transformResponse: (r: unknown) => {
+        const obj = (r || {}) as { access_token?: unknown; access?: unknown }
+        if (typeof obj.access_token === 'string') return obj as { access_token: string; token_type: string }
+        if (typeof obj.access === 'string') return { access_token: obj.access, token_type: 'bearer' }
+        return { access_token: '', token_type: 'bearer' }
+      },
     }),
     getCurrentUser: builder.query<User, void>({
       query: () => '/auth/me',
@@ -311,36 +461,112 @@ export const api = createApi({
 
     // Categories endpoints
     getCategories: builder.query<Category[], void>({
-      query: () => '/categories',
+      query: () => (USE_MOCKS ? '/categories' : '/shop/categories/'),
+      transformResponse: (resp: unknown): Category[] => {
+        if (Array.isArray(resp)) return resp as Category[]
+        if (resp && typeof resp === 'object' && 'results' in resp) {
+          const r = resp as { results?: unknown }
+          if (Array.isArray(r.results)) return r.results as Category[]
+        }
+        return []
+      },
       providesTags: ['Category'],
     }),
     getCategory: builder.query<Category, string>({
-      query: (id) => `/categories/${id}`,
+      query: (id) => (USE_MOCKS ? `/categories/${id}` : `/shop/categories/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Category', id }],
     }),
 
     // Products endpoints (paginated shape)
-    getProducts: builder.query<
-      { results: Product[]; count: number; page: number; page_size: number },
-      { categoryId?: string; search?: string; page?: number; pageSize?: number }
-    >({
+  getProducts: builder.query<{ results: Product[]; count: number; page: number; page_size: number }, { categoryId?: string; search?: string; page?: number; pageSize?: number }>({
       query: ({ categoryId, search, page = 1, pageSize = 12 }) => {
         const params = new URLSearchParams()
-        if (categoryId) params.append('category_id', categoryId)
+        // Backend filter expects 'category' (slug). Our mock used category_id. Support both via env flag.
+        const useMocks = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
+        if (categoryId) params.append(useMocks ? 'category_id' : 'category', categoryId)
         if (search) params.append('search', search)
         params.append('page', String(page))
         params.append('page_size', String(pageSize))
-        return `/products?${params.toString()}`
+        return useMocks ? `/products?${params.toString()}` : `/shop/products/?${params.toString()}`
+      },
+      // Transform backend response to ensure products have stock_quantity
+      transformResponse: (response: unknown): { results: Product[]; count: number; page: number; page_size: number } => {
+        interface RawProduct {
+          id?: unknown; name?: unknown; description?: unknown; price?: unknown;
+          stock?: unknown; stock_quantity?: unknown; category_id?: unknown; category?: unknown;
+          created_at?: unknown; updated_at?: unknown;
+        }
+        const normalize = (raw: unknown): Product => {
+          const rp = (raw || {}) as RawProduct
+          const stockVal = typeof rp.stock_quantity === 'number'
+            ? rp.stock_quantity
+            : typeof rp.stock === 'number' ? rp.stock : 0
+          let category_id = 'unknown'
+            if (typeof rp.category_id === 'string' && rp.category_id) category_id = rp.category_id
+            else if (typeof rp.category === 'string') category_id = rp.category
+            else if (rp.category && typeof rp.category === 'object' && typeof (rp.category as { id?: unknown }).id === 'string') {
+              category_id = (rp.category as { id: string }).id
+            }
+          return {
+            id: String(rp.id ?? ''),
+            name: String(rp.name ?? ''),
+            description: String(rp.description ?? ''),
+            price: Number(rp.price ?? 0),
+            stock_quantity: stockVal,
+            category_id,
+            category: rp.category as (Product['category']),
+            created_at: String(rp.created_at ?? ''),
+            updated_at: String(rp.updated_at ?? ''),
+          }
+        }
+        if (Array.isArray(response)) {
+          return { results: response.map(normalize), count: response.length, page: 1, page_size: response.length }
+        }
+        if (response && typeof response === 'object' && 'results' in response) {
+          const obj = response as { results?: unknown[]; count?: unknown; page?: unknown; page_size?: unknown }
+          if (Array.isArray(obj.results)) {
+            const results = obj.results.map(normalize)
+            return {
+              results,
+              count: typeof obj.count === 'number' ? obj.count : results.length,
+              page: typeof obj.page === 'number' ? obj.page : 1,
+              page_size: typeof obj.page_size === 'number' ? obj.page_size : results.length,
+            }
+          }
+        }
+        return { results: [], count: 0, page: 1, page_size: 0 }
       },
       providesTags: ['Product'],
     }),
     getProduct: builder.query<Product, string>({
-      query: (id) => `/products/${id}`,
+      query: (id) => (USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`),
+      transformResponse: (raw: unknown): Product => {
+        interface RawProduct { id?: unknown; name?: unknown; description?: unknown; price?: unknown; stock?: unknown; stock_quantity?: unknown; category_id?: unknown; category?: unknown; created_at?: unknown; updated_at?: unknown }
+        const r = (raw || {}) as RawProduct
+        const stockVal = typeof r.stock_quantity === 'number' ? r.stock_quantity : typeof r.stock === 'number' ? r.stock : 0
+        let category_id = 'unknown'
+        if (typeof r.category_id === 'string' && r.category_id) category_id = r.category_id
+        else if (typeof r.category === 'string') category_id = r.category
+        else if (r.category && typeof r.category === 'object' && typeof (r.category as { id?: unknown }).id === 'string') {
+          category_id = (r.category as { id: string }).id
+        }
+        return {
+          id: String(r.id ?? ''),
+          name: String(r.name ?? ''),
+          description: String(r.description ?? ''),
+            price: Number(r.price ?? 0),
+          stock_quantity: stockVal,
+          category_id,
+          category: r.category as (Product['category']),
+          created_at: String(r.created_at ?? ''),
+          updated_at: String(r.updated_at ?? ''),
+        }
+      },
       providesTags: (result, error, id) => [{ type: 'Product', id }],
     }),
     createProduct: builder.mutation<Product, Partial<Product>>({
       query: (body) => ({
-        url: '/products',
+        url: USE_MOCKS ? '/products' : '/shop/products/',
         method: 'POST',
         body,
       }),
@@ -348,7 +574,7 @@ export const api = createApi({
     }),
     updateProduct: builder.mutation<Product, { id: string; data: Partial<Product> }>({
       query: ({ id, data }) => ({
-        url: `/products/${id}`,
+        url: USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`,
         method: 'PATCH',
         body: data,
       }),
@@ -356,7 +582,7 @@ export const api = createApi({
     }),
     deleteProduct: builder.mutation<{ success: boolean }, { id: string }>({
       query: ({ id }) => ({
-        url: `/products/${id}`,
+        url: USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Product'],
@@ -422,6 +648,9 @@ export const {
   useGetCategoryQuery,
   useGetProductsQuery,
   useGetProductQuery,
+  useCreateProductMutation,
+  useUpdateProductMutation,
+  useDeleteProductMutation,
   useGetOrdersQuery,
   useGetOrderQuery,
   useCreateOrderMutation,

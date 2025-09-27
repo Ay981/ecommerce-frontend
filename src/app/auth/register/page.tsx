@@ -16,11 +16,13 @@ export default function RegisterPage() {
   const [registerMutation, { isLoading }] = useRegisterMutation()
   const { addToast } = useToast()
   
+  const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     first_name: '',
     last_name: '',
+    username: '',
   })
   const [error, setError] = useState('')
 
@@ -30,11 +32,37 @@ export default function RegisterPage() {
 
     try {
       const result = await registerMutation(formData).unwrap()
-      dispatch(setCredentials({ user: result.user, token: result.access_token }))
-      addToast({ variant: 'success', title: 'Account created', message: 'Welcome! You are now signed in.' })
-      router.push('/')
+      if (result.access_token) {
+        // Mock path gives token immediately
+        dispatch(setCredentials({ user: result.user, token: result.access_token }))
+        addToast({ variant: 'success', title: 'Account created', message: 'Welcome! You are now signed in.' })
+        router.push('/')
+      } else {
+        // Real backend: redirect to login
+        addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
+        router.push('/auth/login')
+      }
     } catch (err) {
-      const message = (err as { data?: { detail?: string } })?.data?.detail ?? 'Registration failed'
+      // Try to extract DRF-style validation errors
+      let message = 'Registration failed'
+      const data = (err as { data?: unknown })?.data as Record<string, unknown> | undefined
+      if (data) {
+        if (typeof data.detail === 'string') {
+          message = data.detail
+        } else {
+          // Collect first message for each field
+            const parts: string[] = []
+            for (const [field, val] of Object.entries(data)) {
+              if (field === 'detail') continue
+              if (Array.isArray(val) && val.length) {
+                parts.push(`${field}: ${val[0]}`)
+              } else if (typeof val === 'string') {
+                parts.push(`${field}: ${val}`)
+              }
+            }
+            if (parts.length) message = parts.join(' | ')
+        }
+      }
       setError(message)
     }
   }
@@ -83,6 +111,14 @@ export default function RegisterPage() {
                     className="mt-1 block w-full px-3 py-2 text-sm shadow-sm form-input-base form-input-placeholder form-input-focus" placeholder="Last name" />
                 </div>
               </div>
+
+              {!USE_MOCKS && (
+                <div>
+                  <label htmlFor="username" className="mb-1 block text-sm font-medium">Username (optional)</label>
+                  <input id="username" name="username" type="text" value={formData.username} onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2 text-sm shadow-sm form-input-base form-input-placeholder form-input-focus" placeholder="Will default to email prefix if empty" />
+                </div>
+              )}
 
               <div>
                 <label htmlFor="email" className="mb-1 block text-sm font-medium">Email</label>
