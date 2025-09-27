@@ -16,11 +16,11 @@ export function AuthIllustration({ alt = 'E-commerce illustration', className }:
           fill
           priority
           sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover"
+          className="object-cover brightness-110 contrast-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/60 mix-blend-multiply" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-3xl md:text-5xl font-bold text-white tracking-wide drop-shadow"></span>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/40 via-transparent to-white/10 mix-blend-screen" />
+        <div className="absolute inset-x-0 bottom-0 p-4 text-center">
+          <span className="text-xs font-medium tracking-wide text-white/80 drop-shadow-sm">ALX Ecommerce</span>
         </div>
       </div>
     </div>
