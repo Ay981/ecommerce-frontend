@@ -77,13 +77,13 @@ export default function OrderDetailPage() {
             </div>
             <div className="text-right">
               <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-                order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'
+                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                order.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
               }`}>
-                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                {order.status === 'pending' && 'Pending'}
+                {order.status === 'completed' && 'Completed'}
+                {order.status === 'failed' && 'Failed'}
               </span>
               <p className="text-2xl font-bold text-foreground mt-2">
                 ${order.total_amount.toFixed(2)}
@@ -194,32 +194,30 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
                 
-                {order.status === 'processing' && (
+                {order.status === 'pending' && (
                   <div className="flex items-center space-x-3">
                     <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Processing</p>
-                      <p className="text-xs text-muted-foreground">Your order is being prepared</p>
+                      <p className="text-sm font-medium text-foreground">Pending</p>
+                      <p className="text-xs text-muted-foreground">Awaiting fulfillment</p>
                     </div>
                   </div>
                 )}
-                
-                {['shipped', 'delivered'].includes(order.status) && (
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Shipped</p>
-                      <p className="text-xs text-muted-foreground">Your order is on its way</p>
-                    </div>
-                  </div>
-                )}
-                
-                {order.status === 'delivered' && (
+                {order.status === 'completed' && (
                   <div className="flex items-center space-x-3">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Delivered</p>
-                      <p className="text-xs text-muted-foreground">Your order has been delivered</p>
+                      <p className="text-sm font-medium text-foreground">Completed</p>
+                      <p className="text-xs text-muted-foreground">Order fulfilled successfully</p>
+                    </div>
+                  </div>
+                )}
+                {order.status === 'failed' && (
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Failed</p>
+                      <p className="text-xs text-muted-foreground">Order was cancelled or failed</p>
                     </div>
                   </div>
                 )}
