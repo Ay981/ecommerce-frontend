@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { useLoginMutation } from '@/lib/api'
@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [addToCart] = useAddToCartMutation()
   const localCartItems = useAppSelector(s => s.cart.items)
   const { addToast } = useToast()
+  const searchParams = useSearchParams()
+  const nextPath = searchParams.get('next') || '/'
   
   const [formData, setFormData] = useState({
     email: '',
@@ -40,7 +42,7 @@ export default function LoginPage() {
         } catch {/* ignore individual failures */}
       }
       addToast({ variant: 'success', title: 'Welcome back', message: 'You are now logged in.' })
-      router.push('/')
+  router.push(nextPath.startsWith('/') ? nextPath : '/')
     } catch (err) {
       const message = (err as { data?: { detail?: string } })?.data?.detail ?? 'Login failed'
       setError(message)

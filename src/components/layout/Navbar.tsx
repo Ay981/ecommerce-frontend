@@ -42,6 +42,13 @@ export default function Navbar() {
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
   const [accountOpen, setAccountOpen] = useState(false)
+
+  const handleCartClick: React.MouseEventHandler<HTMLAnchorElement | HTMLButtonElement> = (e) => {
+    if (!isAuthenticated) {
+      e.preventDefault()
+      router.push('/auth/login?next=/cart')
+    }
+  }
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
@@ -93,8 +100,8 @@ export default function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center space-x-2 md:space-x-4">
-            {/* Cart */}
-            <Link href="/cart" className="relative">
+            {/* Cart (redirects to login if not authenticated) */}
+            <Link href="/cart" className="relative" onClick={handleCartClick} aria-label="Cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemCount > 0 && (
@@ -202,7 +209,10 @@ export default function Navbar() {
               <Link
                 href="/cart"
                 className="flex items-center px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={(e) => {
+                  handleCartClick(e)
+                  setIsMenuOpen(false)
+                }}
               >
                 Cart
                 {cartItemCount > 0 && (
