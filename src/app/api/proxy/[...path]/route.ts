@@ -83,13 +83,12 @@ async function handleProxy(req: NextRequest, params: { path?: string[] }) {
   return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: respHeaders })
 }
 
-// In newer Next.js versions the route context can be a promise; always await before accessing params
-type Ctx = { params: { path?: string[] } }
-async function extract(c: Ctx | Promise<Ctx>): Promise<{ path?: string[] }> { return (await c).params }
+// Route handlers must use the standard context shape: { params: { path: string[] } }
+type RouteCtx = { params: { path?: string[] } }
 
-export async function GET(req: NextRequest, ctx: Ctx | Promise<Ctx>) { return handleProxy(req, await extract(ctx)) }
-export async function POST(req: NextRequest, ctx: Ctx | Promise<Ctx>) { return handleProxy(req, await extract(ctx)) }
-export async function PUT(req: NextRequest, ctx: Ctx | Promise<Ctx>) { return handleProxy(req, await extract(ctx)) }
-export async function PATCH(req: NextRequest, ctx: Ctx | Promise<Ctx>) { return handleProxy(req, await extract(ctx)) }
-export async function DELETE(req: NextRequest, ctx: Ctx | Promise<Ctx>) { return handleProxy(req, await extract(ctx)) }
-export async function OPTIONS(req: NextRequest, ctx: Ctx | Promise<Ctx>) { return handleProxy(req, await extract(ctx)) }
+export async function GET(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
+export async function POST(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
+export async function PUT(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
+export async function PATCH(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
+export async function DELETE(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
+export async function OPTIONS(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
