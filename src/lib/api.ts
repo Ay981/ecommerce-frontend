@@ -90,8 +90,8 @@ export interface CartResponse {
 export interface Order {
   id: string
   user_id: string
-  // Backend enum: pending | success | failed. Map later if you introduce richer lifecycle.
-  status: 'pending' | 'success' | 'failed'
+  // Backend enum (spec): pending | completed (optionally failed). Keep 'failed' for robustness.
+  status: 'pending' | 'completed' | 'failed'
   // Frontend canonical total; backend field is total_price (translate when wiring real endpoint)
   total_amount: number
   shipping_address: string
@@ -144,7 +144,8 @@ export const api = createApi({
         }
         // Simulate network delay
         await new Promise((r) => setTimeout(r, 120))
-        const urlNoTrailQ = url.replace(/\?$/, '')
+  const urlNoTrailQ = url.replace(/\?$/, '')
+  const urlCanonical = urlNoTrailQ.replace(/\/+$/, '')
 
         // In-memory mock cart state
         // Note: this resets on reload; suitable for UX/dev only
@@ -161,36 +162,36 @@ export const api = createApi({
           ).reduce((sum, it) => sum + it.product.price * it.quantity, 0),
         }
         // Auth
-        if (urlNoTrailQ === '/auth/login' && method === 'POST') {
+        if (urlCanonical === '/auth/login' && method === 'POST') {
           return { data: { access_token: 'mocktoken', token_type: 'bearer', user: mockUser } }
         }
-        if (urlNoTrailQ === '/auth/register' && method === 'POST') {
+        if (urlCanonical === '/auth/register' && method === 'POST') {
           return { data: { access_token: 'mocktoken', token_type: 'bearer', user: mockUser } }
         }
-        if (urlNoTrailQ === '/auth/token/refresh' && method === 'POST') {
+        if (urlCanonical === '/auth/token/refresh' && method === 'POST') {
           return { data: { access_token: 'mocktoken-refreshed', token_type: 'bearer' } }
         }
-        if (urlNoTrailQ === '/auth/me') {
+        if (urlCanonical === '/users/me') {
           return { data: mockUser }
         }
-        if (urlNoTrailQ === '/users/me' && (method === 'PUT' || method === 'PATCH')) {
+        if (urlCanonical === '/users/me' && (method === 'PUT' || method === 'PATCH')) {
           return { data: mockUser }
         }
-        if (urlNoTrailQ === '/auth/logout' && method === 'POST') {
+        if (urlCanonical === '/auth/logout' && method === 'POST') {
           return { data: undefined }
         }
         // Categories
-        if (urlNoTrailQ === '/categories') {
+        if (urlCanonical === '/categories') {
           return { data: mockCategories }
         }
-        if (urlNoTrailQ.startsWith('/categories/')) {
-          const id = urlNoTrailQ.split('/').pop()
+        if (urlCanonical.startsWith('/categories/')) {
+          const id = urlCanonical.split('/').pop()
             const cat = mockCategories.find((c) => c.id === id)
             if (!cat) return { error: { status: 404, data: 'Category not found' } }
             return { data: cat }
         }
         // Products
-        if (urlNoTrailQ.startsWith('/products')) {
+        if (urlCanonical.startsWith('/products')) {
           // parse query params
           let filtered = mockProducts
           if (url.includes('?')) {
@@ -201,7 +202,7 @@ export const api = createApi({
             if (search) filtered = filtered.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
           }
           if (/^\/products(\/?|\?.*)?$/.test(url)) return { data: filtered }
-          const id = urlNoTrailQ.split('/').pop()
+          const id = urlCanonical.split('/').pop()
           const prod = mockProducts.find((p) => p.id === id)
           if (!prod) return { error: { status: 404, data: 'Product not found' } }
           return { data: prod }
@@ -211,7 +212,7 @@ export const api = createApi({
         globalThis.__mockOrders = globalThis.__mockOrders || [...mockOrders]
         // @ts-expect-error read global mock orders
         let mockOrdersStore: Order[] = globalThis.__mockOrders
-        if (urlNoTrailQ === '/orders' && method === 'POST') {
+  if (urlCanonical === '/orders' && method === 'POST') {
           // @ts-expect-error read cart items snapshot before clearing
           const cartItems: ServerCartItem[] = (globalThis.__mockCart.items as ServerCartItem[]).map(it => ({ ...it, product: { ...it.product } }))
           const orderId = 'order_' + Math.random().toString(36).slice(2)
@@ -243,21 +244,21 @@ export const api = createApi({
           globalThis.__mockCart.items = []
           return { data: newOrder }
         }
-        if (urlNoTrailQ === '/orders') {
+        if (urlCanonical === '/orders') {
           return { data: mockOrdersStore }
         }
-        if (urlNoTrailQ.startsWith('/orders/')) {
-          const id = urlNoTrailQ.split('/').pop()
+        if (urlCanonical.startsWith('/orders/')) {
+          const id = urlCanonical.split('/').pop()
           const ord = mockOrdersStore.find((o) => o.id === id)
           if (!ord) return { error: { status: 404, data: 'Order not found' } }
           return { data: ord }
         }
 
         // Cart endpoints (mock)
-        if (urlNoTrailQ === '/cart' && method === 'GET') {
+  if (urlCanonical === '/cart' && method === 'GET') {
           return { data: mockCart }
         }
-        if (urlNoTrailQ === '/cart/add' && method === 'POST') {
+  if (urlCanonical === '/cart/add' && method === 'POST') {
           // parse body
           // For simplicity, support args as object only
           if (typeof args === 'object' && args.body) {
@@ -298,8 +299,8 @@ export const api = createApi({
             return { data: updatedCart }
           }
         }
-        if (urlNoTrailQ.startsWith('/cart/item/') && method === 'PUT') {
-          const itemId = urlNoTrailQ.split('/').pop()!
+        if (urlCanonical.startsWith('/cart/item/') && method === 'PUT') {
+          const itemId = urlCanonical.split('/').pop()!
           if (typeof args === 'object' && args.body) {
             const body = args.body as { quantity: number }
             // @ts-expect-error - read items from mock cart
@@ -328,8 +329,8 @@ export const api = createApi({
             return { data: updatedCart }
           }
         }
-        if (urlNoTrailQ.startsWith('/cart/item/') && method === 'DELETE') {
-          const itemId = urlNoTrailQ.split('/').pop()!
+        if (urlCanonical.startsWith('/cart/item/') && method === 'DELETE') {
+          const itemId = urlCanonical.split('/').pop()!
           // @ts-expect-error reading current items from global mock cart
           let current: ServerCartItem[] = globalThis.__mockCart.items
           if (Object.isFrozen(current)) current = [...current]
@@ -492,12 +493,12 @@ export const api = createApi({
       },
     }),
     getCurrentUser: builder.query<User, void>({
-      query: () => '/auth/me',
+      query: () => '/users/me/',
       providesTags: ['User'],
     }),
     updateCurrentUser: builder.mutation<User, Partial<User>>({
       query: (patch) => ({
-        url: '/users/me',
+        url: '/users/me/',
         method: 'PATCH',
         body: patch,
       }),
@@ -505,7 +506,7 @@ export const api = createApi({
     }),
     logout: builder.mutation<void, void>({
       query: () => ({
-        url: '/auth/logout',
+        url: '/auth/logout/',
         method: 'POST',
       }),
       invalidatesTags: ['User'],
@@ -513,7 +514,7 @@ export const api = createApi({
 
     // Categories endpoints
     getCategories: builder.query<Category[], void>({
-      query: () => (USE_MOCKS ? '/categories' : '/shop/categories/'),
+      query: () => (USE_MOCKS ? '/categories' : '/categories/'),
       transformResponse: (resp: unknown): Category[] => {
         if (Array.isArray(resp)) return resp as Category[]
         if (resp && typeof resp === 'object' && 'results' in resp) {
@@ -525,7 +526,7 @@ export const api = createApi({
       providesTags: ['Category'],
     }),
     getCategory: builder.query<Category, string>({
-      query: (id) => (USE_MOCKS ? `/categories/${id}` : `/shop/categories/${id}/`),
+      query: (id) => (USE_MOCKS ? `/categories/${id}` : `/categories/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Category', id }],
     }),
 
@@ -541,7 +542,7 @@ export const api = createApi({
         params.append('page', String(page))
         // Retain pageSize only for mock pagination simulation (do NOT send to real backend)
         if (useMocks) params.append('page_size', String(pageSize))
-        return useMocks ? `/products?${params.toString()}` : `/shop/products/?${params.toString()}`
+  return useMocks ? `/products?${params.toString()}` : `/products/?${params.toString()}`
       },
       // Transform backend response to ensure products have stock_quantity
       transformResponse: (response: unknown): { results: Product[]; count: number; page: number; page_size: number } => {
@@ -595,7 +596,7 @@ export const api = createApi({
       providesTags: ['Product'],
     }),
     getProduct: builder.query<Product, string>({
-      query: (id) => (USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`),
+      query: (id) => (USE_MOCKS ? `/products/${id}` : `/products/${id}/`),
       transformResponse: (raw: unknown): Product => {
         interface RawProduct { id?: unknown; name?: unknown; description?: unknown; price?: unknown; stock?: unknown; stock_quantity?: unknown; category_id?: unknown; category?: unknown; created_at?: unknown; updated_at?: unknown }
         const r = (raw || {}) as RawProduct
@@ -622,7 +623,7 @@ export const api = createApi({
     }),
     createProduct: builder.mutation<Product, Partial<Product>>({
       query: (body) => ({
-        url: USE_MOCKS ? '/products' : '/shop/products/',
+        url: USE_MOCKS ? '/products' : '/products/',
         method: 'POST',
         body,
       }),
@@ -630,7 +631,7 @@ export const api = createApi({
     }),
     updateProduct: builder.mutation<Product, { id: string; data: Partial<Product> }>({
       query: ({ id, data }) => ({
-        url: USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`,
+        url: USE_MOCKS ? `/products/${id}` : `/products/${id}/`,
         method: 'PATCH',
         body: data,
       }),
@@ -638,7 +639,7 @@ export const api = createApi({
     }),
     deleteProduct: builder.mutation<{ success: boolean }, { id: string }>({
       query: ({ id }) => ({
-        url: USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`,
+        url: USE_MOCKS ? `/products/${id}` : `/products/${id}/`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Product'],
@@ -646,15 +647,15 @@ export const api = createApi({
 
     // Orders endpoints
     getOrders: builder.query<Order[], void>({
-      query: () => '/orders',
+      query: () => '/orders/',
       transformResponse: (resp: unknown): Order[] => {
         interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
         interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
         const mapStatus = (s: unknown): Order['status'] => {
-          if (s === 'pending' || s === 'success' || s === 'failed') return s
-          // Map any legacy / mock extended statuses back if encountered
+          if (s === 'pending' || s === 'completed' || s === 'failed') return s
+          if (s === 'success') return 'completed'
           if (s === 'processing') return 'pending'
-          if (s === 'shipped' || s === 'delivered') return 'success'
+          if (s === 'shipped' || s === 'delivered') return 'completed'
           if (s === 'cancelled') return 'failed'
           return 'pending'
         }
@@ -684,7 +685,7 @@ export const api = createApi({
       providesTags: ['Order'],
     }),
     getOrder: builder.query<Order, string>({
-      query: (id) => `/orders/${id}`,
+      query: (id) => `/orders/${id}/`,
       transformResponse: (o: unknown): Order => {
         interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
         interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
@@ -694,7 +695,7 @@ export const api = createApi({
         return {
           id: String(raw.id ?? ''),
           user_id: String(raw.user_id ?? raw.user ?? ''),
-          status: (status === 'pending' || status === 'success' || status === 'failed') ? status : 'pending',
+          status: (status === 'pending' || status === 'completed' || status === 'failed') ? (status as Order['status']) : status === 'success' ? 'completed' : 'pending',
           total_amount: typeof raw.total_amount === 'number' ? raw.total_amount as number : Number(raw.total_price ?? 0),
           shipping_address: String(raw.shipping_address ?? ''),
           created_at: String(raw.created_at ?? ''),
@@ -713,7 +714,7 @@ export const api = createApi({
     }),
     createOrder: builder.mutation<Order, CreateOrderRequest>({
       query: (orderData) => ({
-        url: '/orders',
+        url: '/orders/',
         method: 'POST',
         body: orderData,
       }),
@@ -725,7 +726,11 @@ export const api = createApi({
         return {
           id: String(raw.id ?? ''),
           user_id: String(raw.user_id ?? raw.user ?? ''),
-          status: (raw.status === 'pending' || raw.status === 'success' || raw.status === 'failed') ? raw.status : 'pending',
+          status: (raw.status === 'pending' || raw.status === 'completed' || raw.status === 'failed')
+            ? (raw.status as Order['status'])
+            : raw.status === 'success'
+              ? 'completed'
+              : 'pending',
           total_amount: typeof raw.total_amount === 'number' ? raw.total_amount as number : Number(raw.total_price ?? 0),
           shipping_address: String(raw.shipping_address ?? ''),
           created_at: String(raw.created_at ?? ''),
@@ -745,12 +750,12 @@ export const api = createApi({
 
     // Cart endpoints
     getCart: builder.query<CartResponse, void>({
-      query: () => '/cart',
+      query: () => '/cart/',
       providesTags: ['Cart'],
     }),
     addToCart: builder.mutation<CartResponse, { product_id: string; quantity?: number }>({
       query: (body) => ({
-        url: '/cart/add',
+        url: '/cart/add/',
         method: 'POST',
         body,
       }),
@@ -758,7 +763,7 @@ export const api = createApi({
     }),
     updateCartItem: builder.mutation<CartResponse, { item_id: string; quantity: number }>({
       query: ({ item_id, quantity }) => ({
-        url: `/cart/item/${item_id}`,
+        url: `/cart/item/${item_id}/`,
         method: 'PUT',
         body: { quantity },
       }),
@@ -766,7 +771,7 @@ export const api = createApi({
     }),
     removeCartItem: builder.mutation<CartResponse, { item_id: string }>({
       query: ({ item_id }) => ({
-        url: `/cart/item/${item_id}`,
+        url: `/cart/item/${item_id}/`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Cart'],

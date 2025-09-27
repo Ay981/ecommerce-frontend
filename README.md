@@ -1,6 +1,6 @@
 # 🛍️ E‑Commerce Frontend (Next.js App Router)
 
-Production‑ready Next.js 15 (App Router) storefront with TypeScript, Tailwind, i18n, theming, and RTK Query data layer. Supports two modes:
+Production‑ready Next.js 15 (App Router) storefront with TypeScript, Tailwind, theming, and RTK Query data layer. Supports two modes:
 
 1. Real backend mode (Django REST API at `NEXT_PUBLIC_API_BASE_URL`)
 2. Mock mode (in‑memory data for local UX / rapid prototyping)
@@ -9,11 +9,8 @@ Production‑ready Next.js 15 (App Router) storefront with TypeScript, Tailwind,
 
 ## ✨ Features
 
-### 🌐 **Internationalization (i18n)**
-- **Multi-language Support**: English, Spanish, and French
-- **Dynamic Language Switching**: Seamless language changes with preserved navigation
-- **Localized Content**: All UI elements, messages, and content translated
-- **RTL Support Ready**: Architecture prepared for right-to-left languages
+### (Removed) Internationalization
+Previous multi-language scaffolding (next-intl) has been removed for a simplified single-language build.
 
 ### 🌙 **Dark Mode & Theming**
 - **System Theme Detection**: Automatically follows user's system preference
@@ -40,7 +37,7 @@ Production‑ready Next.js 15 (App Router) storefront with TypeScript, Tailwind,
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4 with custom design tokens
 - **State Management**: Redux Toolkit + RTK Query
-- **Internationalization**: next-intl
+<!-- Internationalization removed -->
 - **Theming**: next-themes
 - **Icons**: Lucide React
 - **Animations**: Framer Motion
@@ -69,10 +66,7 @@ src/
 │   ├── store.ts               # Redux store configuration
 │   ├── hooks.ts               # Typed Redux hooks
 │   └── utils.ts               # Utility functions
-├── messages/                  # Translation files
-│   ├── en.json                # English translations
-│   ├── es.json                # Spanish translations
-│   └── fr.json                # French translations
+<!-- messages/ directory removed (translations no longer in use) -->
 └── config/                    # Configuration files
 ```
 
@@ -98,30 +92,7 @@ src/
 - **Modals**: Smooth overlay animations
 
 ## 🌍 Internationalization
-
-### Supported Languages
-- **English (en)**: Default language
-- **Spanish (es)**: Complete translation
-- **French (fr)**: Complete translation
-
-### Adding New Languages
-1. Create new translation file in `messages/[locale].json`
-2. Add locale to `src/i18n.ts` locales array
-3. Update middleware configuration
-4. Add language option to `LanguageSwitcher` component
-
-### Translation Structure
-```json
-{
-  "common": { /* Shared translations */ },
-  "navigation": { /* Navigation items */ },
-  "auth": { /* Authentication forms */ },
-  "products": { /* Product-related text */ },
-  "cart": { /* Shopping cart */ },
-  "checkout": { /* Checkout process */ },
-  "orders": { /* Order management */ }
-}
-```
+Removed. If reintroduced, consider dynamic import of message bundles and opt-in locale routes.
 
 ## 🌙 Dark Mode Implementation
 
@@ -214,7 +185,7 @@ The theme system is configured in `src/components/providers/ThemeProvider.tsx`:
 - **Default Locale**: English (en)
 - **Supported Locales**: en, es, fr
 - **Fallback**: Falls back to default locale for missing translations
-- **Routing**: All routes are prefixed with locale (e.g., `/en/products`)
+<!-- Locale-prefixed routing removed -->
 
 ## 🔐 Proxy Strategy
 
