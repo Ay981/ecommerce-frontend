@@ -20,7 +20,7 @@ export function AuthIllustration({ alt = 'E-commerce illustration', className }:
         />
         <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/60 mix-blend-multiply" />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-3xl md:text-5xl font-bold text-white tracking-wide drop-shadow">Shop Smarter</span>
+          <span className="text-3xl md:text-5xl font-bold text-white tracking-wide drop-shadow"></span>
         </div>
       </div>
     </div>
