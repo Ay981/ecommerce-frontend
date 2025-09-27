@@ -1,5 +1,9 @@
 export const runtime = 'nodejs'
 
+// Lightweight health probe retained for local development.
+// In production this endpoint returns 404 unless explicitly enabled via ENABLE_BACKEND_PING=true
+// to avoid leaking internal diagnostics.
+
 interface PingResult {
   ok: boolean
   status: number | null
@@ -23,6 +27,9 @@ async function safeFetch(url: string, init?: RequestInit, captureAllow = false):
 }
 
 export async function GET() {
+  if (process.env.NODE_ENV !== 'development' && process.env.ENABLE_BACKEND_PING !== 'true') {
+    return new Response('Not Found', { status: 404 })
+  }
   const base = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '') + '/api/v1'
   const productsUrl = `${base}/shop/products/?page=1`
   const registerOptionsUrl = `${base}/auth/register/`
@@ -48,26 +55,7 @@ export async function GET() {
   ])
 
   return Response.json({
-    env: {
-      NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-      NEXT_PUBLIC_USE_MOCKS: process.env.NEXT_PUBLIC_USE_MOCKS,
-      resolvedBase: base,
-        useProxy,
-      nodeEnv: process.env.NODE_ENV,
-    },
-    checks: {
-      products,
-      registerOptions,
-      registerPost,
-      loginOptions,
-      loginPost,
-      proxyRegisterOptions,
-      proxyLoginOptions,
-    },
-    guidance: products.ok ? undefined : 'If products shows network error: confirm API base URL, HTTPS vs HTTP mixed content, and CORS. A FETCH_ERROR (no status) usually signals DNS failure, blocked mixed content, or CORS preflight rejection. The registerPost attempt helps distinguish application 4xx/5xx vs network.',
-    notes: {
-      proxyHint: useProxy ? 'Proxy test uses absolute URL derived from NEXT_PUBLIC_SITE_ORIGIN or fallback localhost:3001.' : 'Proxy disabled',
-      server500: 'Status 500 on products/login/register means the backend itself errored (not a network/CORS issue). Check backend logs or database/migrations.'
-    }
+    env: { base: base, useProxy },
+    checks: { products, registerOptions, registerPost, loginOptions, loginPost, proxyRegisterOptions, proxyLoginOptions },
   })
 }

@@ -125,10 +125,9 @@ const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
 // IMPORTANT: Provide NEXT_PUBLIC_API_BASE_URL in your .env.* (see .env.example). Fallback keeps local dev functional.
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '')
 const USE_API_PROXY = process.env.NEXT_PUBLIC_USE_API_PROXY === 'true'
+const LOG_API = process.env.NEXT_PUBLIC_LOG_API === 'true'
 
-if (process.env.NODE_ENV === 'development') {
-  console.info('[API CONFIG]', { USE_MOCKS, API_BASE_URL, USE_API_PROXY })
-}
+if (LOG_API) console.info('[API CONFIG]', { USE_MOCKS, API_BASE_URL, USE_API_PROXY })
 
 export const api = createApi({
   reducerPath: 'api',
@@ -229,7 +228,7 @@ export const api = createApi({
           const newOrder: Order = {
             id: orderId,
             user_id: 'user_mock',
-            status: 'processing',
+            status: 'pending',
             total_amount: total,
             shipping_address: 'Mock Address\nPhone: 000\nEmail: mock@example.com',
             created_at: now,
@@ -378,7 +377,7 @@ export const api = createApi({
         })
         // Return wrapped baseQuery function with logging
   return async (args: string | FetchArgs, apiCtx: Parameters<typeof rawBase>[1], extraOpts: Parameters<typeof rawBase>[2]) => {
-          if (process.env.NODE_ENV === 'development') {
+          if (LOG_API) {
             const url = typeof args === 'string' ? args : (args as FetchArgs).url
             // Log before request to verify constructed relative URL (full = baseUrl + this path)
             console.debug('[API REQ]', url)
@@ -390,14 +389,14 @@ export const api = createApi({
             attempt++
             const delay = 250 * Math.pow(2, attempt - 1) // 250ms, 500ms
             await new Promise(r => setTimeout(r, delay))
-            if (process.env.NODE_ENV === 'development') {
+            if (LOG_API) {
               const url = typeof args === 'string' ? args : (args as FetchArgs).url
               console.debug(`[API RETRY ${attempt}]`, url)
             }
             result = await rawBase(args, apiCtx, extraOpts)
           }
           // (Removed complex automatic fallback logic for clarity and stability.)
-          if (result.error && process.env.NODE_ENV === 'development') {
+          if (result.error && LOG_API) {
             const url = typeof args === 'string' ? args : (args as FetchArgs).url
             const errObj = result.error as unknown as { status?: unknown; data?: unknown; error?: unknown }
             const status = errObj?.status
