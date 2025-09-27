@@ -84,11 +84,17 @@ async function handleProxy(req: NextRequest, params: { path?: string[] }) {
 }
 
 // Route handlers must use the standard context shape: { params: { path: string[] } }
-type RouteCtx = { params: { path?: string[] } }
+// Accept context where params might be a Promise (type inference quirk in some Next builds)
+type MaybePromise<T> = T | Promise<T>
+type RouteCtx = { params: MaybePromise<{ path?: string[] }> }
 
-export async function GET(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
-export async function POST(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
-export async function PUT(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
-export async function PATCH(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
-export async function DELETE(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
-export async function OPTIONS(req: NextRequest, { params }: RouteCtx) { return handleProxy(req, params) }
+async function resolveParams(p: MaybePromise<{ path?: string[] }>): Promise<{ path?: string[] }> {
+  return await p
+}
+
+export async function GET(req: NextRequest, ctx: RouteCtx) { return handleProxy(req, await resolveParams(ctx.params)) }
+export async function POST(req: NextRequest, ctx: RouteCtx) { return handleProxy(req, await resolveParams(ctx.params)) }
+export async function PUT(req: NextRequest, ctx: RouteCtx) { return handleProxy(req, await resolveParams(ctx.params)) }
+export async function PATCH(req: NextRequest, ctx: RouteCtx) { return handleProxy(req, await resolveParams(ctx.params)) }
+export async function DELETE(req: NextRequest, ctx: RouteCtx) { return handleProxy(req, await resolveParams(ctx.params)) }
+export async function OPTIONS(req: NextRequest, ctx: RouteCtx) { return handleProxy(req, await resolveParams(ctx.params)) }
