@@ -131,8 +131,7 @@ export const api = createApi({
         // Note: this resets on reload; suitable for UX/dev only
         // @ts-expect-error - store a simple cart in global for mocks
         globalThis.__mockCart = globalThis.__mockCart || { id: 'cart1', items: [] as ServerCartItem[] }
-        // @ts-expect-error - read the mock cart
-        const mockCart: CartResponse = {
+  const mockCart: CartResponse = {
           // @ts-expect-error - read id from mock cart
           id: globalThis.__mockCart.id,
           // @ts-expect-error - read items from mock cart
@@ -320,20 +319,47 @@ export const api = createApi({
       providesTags: (result, error, id) => [{ type: 'Category', id }],
     }),
 
-    // Products endpoints
-    getProducts: builder.query<Product[], { categoryId?: string; search?: string }>({
-      query: ({ categoryId, search }) => {
+    // Products endpoints (paginated shape)
+    getProducts: builder.query<
+      { results: Product[]; count: number; page: number; page_size: number },
+      { categoryId?: string; search?: string; page?: number; pageSize?: number }
+    >({
+      query: ({ categoryId, search, page = 1, pageSize = 12 }) => {
         const params = new URLSearchParams()
         if (categoryId) params.append('category_id', categoryId)
         if (search) params.append('search', search)
-        const qs = params.toString()
-        return qs ? `/products?${qs}` : '/products'
+        params.append('page', String(page))
+        params.append('page_size', String(pageSize))
+        return `/products?${params.toString()}`
       },
       providesTags: ['Product'],
     }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/products/${id}`,
       providesTags: (result, error, id) => [{ type: 'Product', id }],
+    }),
+    createProduct: builder.mutation<Product, Partial<Product>>({
+      query: (body) => ({
+        url: '/products',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Product'],
+    }),
+    updateProduct: builder.mutation<Product, { id: string; data: Partial<Product> }>({
+      query: ({ id, data }) => ({
+        url: `/products/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: (res, err, { id }) => [{ type: 'Product', id }, 'Product'],
+    }),
+    deleteProduct: builder.mutation<{ success: boolean }, { id: string }>({
+      query: ({ id }) => ({
+        url: `/products/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Product'],
     }),
 
     // Orders endpoints

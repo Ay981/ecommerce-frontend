@@ -3,18 +3,37 @@
 import Link from 'next/link'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { removeItem, updateQuantity } from '@/lib/features/cart/cartSlice'
+import { useGetCartQuery, useUpdateCartItemMutation, useRemoveCartItemMutation } from '@/lib/api'
 import Layout from '@/components/layout/Layout'
 
 export default function CartPage() {
   const dispatch = useAppDispatch()
-  const { items, total } = useAppSelector((state) => state.cart)
+  const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
+  const { isAuthenticated } = useAppSelector(s => s.auth)
+  const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
+  const [updateCartItem] = useUpdateCartItemMutation()
+  const [removeCartItem] = useRemoveCartItemMutation()
 
-  const handleQuantityChange = (productId: string, quantity: number) => {
-    dispatch(updateQuantity({ productId, quantity }))
+  type DisplayItem = { product: typeof localItems[number]['product']; quantity: number; id?: string }
+  const items: DisplayItem[] = isAuthenticated
+    ? (serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity, id: it.id })) || [])
+    : localItems
+  const total = isAuthenticated ? (serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0) : localTotal
+
+  const handleQuantityChange = (productId: string, quantity: number, itemId?: string) => {
+    if (isAuthenticated && itemId) {
+      updateCartItem({ item_id: itemId, quantity })
+    } else {
+      dispatch(updateQuantity({ productId, quantity }))
+    }
   }
 
-  const handleRemoveItem = (productId: string) => {
-    dispatch(removeItem(productId))
+  const handleRemoveItem = (productId: string, itemId?: string) => {
+    if (isAuthenticated && itemId) {
+      removeCartItem({ item_id: itemId })
+    } else {
+      dispatch(removeItem(productId))
+    }
   }
 
   if (items.length === 0) {
@@ -51,7 +70,7 @@ export default function CartPage() {
             <div className="bg-card border rounded-lg shadow-md overflow-hidden">
               <div className="divide-y">
                 {items.map((item) => (
-                  <div key={item.product.id} className="p-6">
+                  <div key={item.id ? `${item.product.id}-${item.id}` : item.product.id} className="p-6">
                     <div className="flex items-center space-x-4">
                       {/* Product Image */}
                       <div className="flex-shrink-0">
@@ -79,14 +98,14 @@ export default function CartPage() {
                       {/* Quantity Controls */}
                       <div className="flex items-center space-x-3">
                         <button
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.id)}
                           className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-accent"
                         >
                           -
                         </button>
                         <span className="w-8 text-center font-medium">{item.quantity}</span>
                         <button
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.id)}
                           disabled={item.quantity >= item.product.stock_quantity}
                           className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -100,7 +119,7 @@ export default function CartPage() {
                           ${(item.product.price * item.quantity).toFixed(2)}
                         </p>
                         <button
-                          onClick={() => handleRemoveItem(item.product.id)}
+                          onClick={() => handleRemoveItem(item.product.id, item.id)}
                           className="text-red-600 hover:text-red-800 text-sm mt-1"
                         >
                           Remove

@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useGetCategoryQuery, useGetProductsQuery, type Product } from '@/lib/api'
-import { useAppDispatch } from '@/lib/hooks'
+import { useGetCategoryQuery, useGetProductsQuery, type Product, useAddToCartMutation } from '@/lib/api'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { addItem } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
 
@@ -14,6 +14,8 @@ export default function CategoryDetailPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const dispatch = useAppDispatch()
+  const { isAuthenticated } = useAppSelector(s => s.auth)
+  const [addToCart] = useAddToCartMutation()
   const [searchTerm, setSearchTerm] = useState('')
   
   const { data: category, isLoading: categoryLoading } = useGetCategoryQuery(params.id as string)
@@ -22,13 +24,23 @@ export default function CategoryDetailPage() {
     const s = searchParams.get('search') || ''
     setSearchTerm(s)
   }, [searchParams])
-  const { data: products, isLoading: productsLoading, error } = useGetProductsQuery({
+  const [page, setPage] = useState(1)
+  const pageSize = 12
+  const { data: productsResp, isLoading: productsLoading, error } = useGetProductsQuery({
     categoryId: params.id as string,
     search: searchTerm || undefined,
+    page,
+    pageSize,
   })
 
-  const handleAddToCart = (product: Product) => {
-    dispatch(addItem({ product, quantity: 1 }))
+  const handleAddToCart = async (product: Product) => {
+    if (isAuthenticated) {
+      try {
+        await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
+      } catch {/* noop */}
+    } else {
+      dispatch(addItem({ product, quantity: 1 }))
+    }
   }
 
   if (categoryLoading || productsLoading) {
@@ -97,7 +109,7 @@ export default function CategoryDetailPage() {
 
         {/* Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products?.map((product) => (
+          {productsResp?.results.map((product) => (
             <div key={product.id} className="bg-card border rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
               <Link href={`/products/${product.id}`}>
                 <div className="aspect-w-1 aspect-h-1 bg-muted">
@@ -139,9 +151,25 @@ export default function CategoryDetailPage() {
           ))}
         </div>
 
-        {products?.length === 0 && (
+        {productsResp && productsResp.results.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg">No products found in this category.</p>
+          </div>
+        )}
+
+        {productsResp && productsResp.count > pageSize && (
+          <div className="flex items-center justify-center gap-4 mt-10">
+            <button
+              className="px-4 py-2 border rounded-md text-sm hover:bg-accent disabled:opacity-50"
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >Previous</button>
+            <span className="text-sm text-muted-foreground">Page {page} of {Math.ceil(productsResp.count / pageSize)}</span>
+            <button
+              className="px-4 py-2 border rounded-md text-sm hover:bg-accent disabled:opacity-50"
+              disabled={page >= Math.ceil(productsResp.count / pageSize)}
+              onClick={() => setPage(p => p + 1)}
+            >Next</button>
           </div>
         )}
       </div>

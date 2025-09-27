@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useGetProductsQuery, useGetCategoriesQuery, type Product } from '@/lib/api'
+import { useGetProductsQuery, useGetCategoriesQuery, type Product, useAddToCartMutation } from '@/lib/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { addItem } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
@@ -20,16 +20,28 @@ import { useToast } from '@/components/providers/ToastProvider'
 export default function HomeLanding() {
   const dispatch = useAppDispatch()
   const { items } = useAppSelector((state) => state.cart)
-  const { data: featuredProducts } = useGetProductsQuery({})
+  const { data: featuredProductsResp } = useGetProductsQuery({ page: 1, pageSize: 40 })
   const { data: categories } = useGetCategoriesQuery()
   const { addToast } = useToast()
+  const { isAuthenticated } = useAppSelector(s => s.auth)
+  const [addToCart] = useAddToCartMutation()
 
-  const handleAddToCart = (product: Product) => {
-    dispatch(addItem({ product, quantity: 1 }))
-  addToast({ title: 'Added to cart', message: `${product.name} was added to your cart.` })
+  const handleAddToCart = async (product: Product) => {
+    if (isAuthenticated) {
+      try {
+        await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
+        addToast({ title: 'Added to cart', message: `${product.name} was added to your cart.` })
+      } catch {
+        addToast({ variant: 'error', title: 'Error', message: 'Failed adding to cart' })
+      }
+    } else {
+      dispatch(addItem({ product, quantity: 1 }))
+      addToast({ title: 'Added to cart', message: `${product.name} was added to your cart.` })
+    }
   }
 
-  const featured = featuredProducts?.slice(0, 4) || []
+  const featuredProducts = featuredProductsResp?.results || []
+  const featured = featuredProducts.slice(0, 4)
   const featuredCategories = categories?.slice(0, 3) || []
 
   const features = [
@@ -42,7 +54,7 @@ export default function HomeLanding() {
   return (
   <Layout>
   {/* Flash Sales */}
-  {featuredProducts && (
+  {featuredProducts.length > 0 && (
     <FlashSales products={featuredProducts} onAddToCartAction={handleAddToCart} />
   )}
         {/* Hero */}
@@ -109,12 +121,12 @@ export default function HomeLanding() {
   <MegaBanner />
 
   {/* Explore Grid */}
-  {featuredProducts && (
+  {featuredProducts.length > 0 && (
     <ExploreGrid products={featuredProducts} onAddAction={handleAddToCart} />
   )}
 
   {/* New Arrival */}
-  {featuredProducts && <NewArrival products={featuredProducts} />}
+  {featuredProducts.length > 0 && <NewArrival products={featuredProducts} />}
 
         {/* Categories */}
         <section className="py-16">

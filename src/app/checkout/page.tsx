@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
-import { useCreateOrderMutation } from '@/lib/api'
+import { useCreateOrderMutation, useGetCartQuery } from '@/lib/api'
 import { clearCart } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
 import { useToast } from '@/components/providers/ToastProvider'
@@ -11,8 +11,9 @@ import { useToast } from '@/components/providers/ToastProvider'
 export default function CheckoutPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const { items, total } = useAppSelector((state) => state.cart)
+  const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
   const { isAuthenticated } = useAppSelector((state) => state.auth)
+  const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
   const [createOrderMutation, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
   
@@ -37,8 +38,15 @@ export default function CheckoutPage() {
     return null
   }
 
-  // Redirect to cart if empty
-  if (items.length === 0) {
+  const effectiveItems = isAuthenticated
+    ? (serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || [])
+    : localItems
+  const baseTotal = isAuthenticated
+    ? (serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0)
+    : localTotal
+
+  // Redirect to cart if empty (after server cart load if authenticated)
+  if (effectiveItems.length === 0 && (!isAuthenticated || serverCart)) {
     router.push('/cart')
     return null
   }
@@ -63,18 +71,24 @@ export default function CheckoutPage() {
         `Email: ${formData.email}`,
       ].filter(Boolean).join('\n')
 
-      const orderData = {
-        shipping_address,
-        items: items.map(item => ({
-          product_id: item.product.id,
-          quantity: item.quantity,
-        })),
-        payment_method: paymentMethod,
-        coupon_code: couponApplied ? couponCode : undefined,
-      }
+      const orderData = isAuthenticated
+        ? {
+            shipping_address,
+            items: [], // server will derive items from authenticated cart
+            payment_method: paymentMethod,
+            coupon_code: couponApplied ? couponCode : undefined,
+          }
+        : {
+            shipping_address,
+            items: localItems.map(item => ({ product_id: item.product.id, quantity: item.quantity })),
+            payment_method: paymentMethod,
+            coupon_code: couponApplied ? couponCode : undefined,
+          }
 
       const order = await createOrderMutation(orderData).unwrap()
-      dispatch(clearCart())
+      if (!isAuthenticated) {
+        dispatch(clearCart())
+      }
       addToast({ message: 'Order placed successfully', variant: 'success' })
       router.push(`/orders/${order.id}`)
     } catch (err) {
@@ -90,8 +104,8 @@ export default function CheckoutPage() {
     setFormData((p) => ({ ...p, [name]: value }))
   }
 
-  const discountAmount = !couponApplied ? 0 : parseFloat((total * 0.1).toFixed(2))
-  const grandTotal = Math.max(total - discountAmount, 0)
+  const discountAmount = !couponApplied ? 0 : parseFloat((baseTotal * 0.1).toFixed(2))
+  const grandTotal = Math.max(baseTotal - discountAmount, 0)
 
   const applyCoupon = () => {
     const code = couponCode.trim().toUpperCase()
@@ -223,20 +237,20 @@ export default function CheckoutPage() {
             <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
             <div className="space-y-4 mb-4">
-              {items.map((item) => (
+              {effectiveItems.map((item) => (
                 <div key={item.product.id} className="flex items-center gap-3">
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">IMG</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{item.product.name}</div>
                     <div className="text-xs text-muted-foreground">Qty: {item.quantity}</div>
                   </div>
-                  <div className="text-sm font-medium">${(item.product.price * item.quantity).toFixed(2)}</div>
+                    <div className="text-sm font-medium">${(item.product.price * item.quantity).toFixed(2)}</div>
                 </div>
               ))}
             </div>
 
             <div className="space-y-2 border-t pt-4 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">${total.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">${baseTotal.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span className="font-medium">Free</span></div>
               {couponApplied && (
                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400"><span>Coupon (SAVE10)</span><span>- ${discountAmount.toFixed(2)}</span></div>
