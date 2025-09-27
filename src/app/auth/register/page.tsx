@@ -137,10 +137,7 @@ export default function RegisterPage() {
                 {isLoading ? 'Creating account…' : 'Create Account'}
               </Button>
 
-              <Button type="button" variant="outline" className="w-full">
-                <span className="mr-2 grid h-5 w-5 place-items-center rounded bg-white text-gray-900 text-xs">G</span>
-                Sign up with Google
-              </Button>
+              {/* Third-party auth removed */}
             </form>
 
             <p className="mt-8 text-center text-sm text-muted-foreground">

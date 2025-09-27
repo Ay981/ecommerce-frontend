@@ -141,16 +141,7 @@ function LoginPageInner() {
                 {isLoading ? 'Logging in…' : 'Log in'}
               </Button>
 
-              <div className="relative py-2 text-center text-sm text-muted-foreground">
-                <span className="bg-background px-2 relative z-10">or</span>
-                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t" />
-              </div>
-
-              <Button type="button" variant="outline" className="w-full">
-                {/* Simple G badge */}
-                <span className="mr-2 grid h-5 w-5 place-items-center rounded bg-white text-gray-900 text-xs">G</span>
-                Sign in with Google
-              </Button>
+              {/* Third-party auth removed */}
             </form>
 
             <p className="mt-8 text-center text-sm text-muted-foreground">

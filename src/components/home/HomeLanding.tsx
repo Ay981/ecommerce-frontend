@@ -13,7 +13,6 @@ import PromoBanners from './PromoBanners'
 import BestSellers from './BestSellers'
 import FlashSales from './FlashSales'
 import CategoryRow from './CategoryRow'
-import MegaBanner from './MegaBanner'
 import ExploreGrid, { NewArrival } from './ExploreGrid'
 import { useToast } from '@/components/providers/ToastProvider'
 
@@ -117,8 +116,7 @@ export default function HomeLanding() {
 
   <BestSellers onAddToCartAction={handleAddToCart} />
 
-  {/* Mega Banner */}
-  <MegaBanner />
+  {/* Mega Banner removed */}
 
   {/* Explore Grid */}
   {featuredProducts.length > 0 && (
