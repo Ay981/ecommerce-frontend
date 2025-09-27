@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
@@ -13,7 +13,7 @@ import { useToast } from '@/components/providers/ToastProvider'
 import { Button } from '@/components/ui/Button'
 import { normalizeAuthError, renderFieldErrors } from '@/lib/errors'
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const [loginMutation, { isLoading }] = useLoginMutation()
@@ -155,5 +155,13 @@ export default function LoginPage() {
         </div>
       </div>
     </Layout>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[400px] grid place-items-center text-sm text-muted-foreground">Loading…</div>}>
+      <LoginPageInner />
+    </Suspense>
   )
 }
