@@ -12,7 +12,7 @@ import { ShoppingCart, User, Menu, X, LogOut, Package, XCircle, Star } from 'luc
 import SearchInput from '@/components/ui/SearchInput'
 import { useToast } from '@/components/providers/ToastProvider'
 // import { cn } from '@/lib/utils'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 
 export default function Navbar() {
   const dispatch = useAppDispatch()
@@ -23,6 +23,7 @@ export default function Navbar() {
   const [query, setQuery] = useState('')
   const { addToast } = useToast()
   const router = useRouter()
+  const pathname = usePathname()
 
   const handleLogout = async () => {
     try {
@@ -50,32 +51,35 @@ export default function Navbar() {
     }
   }
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  <nav className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 shadow-sm transition-colors">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">E</span>
+              <div className="h-8 w-8 rounded-lg bg-primary/90 flex items-center justify-center ring-1 ring-border shadow-sm">
+                <span className="text-primary-foreground font-bold text-sm">E</span>
               </div>
-              <span className="text-xl font-bold text-gradient">ALX Ecommerce</span>
+              <span className="text-xl font-extrabold tracking-tight text-foreground">ALX Ecommerce</span>
             </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
-              <Link
-                href="/products"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Products
-              </Link>
-              <Link
-                href="/categories"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Categories
-              </Link>
+              {[
+                { href: '/products', label: 'Products' },
+                { href: '/categories', label: 'Categories' },
+              ].map(link => {
+                const active = pathname.startsWith(link.href)
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`relative text-sm font-medium transition-colors px-0.5 ${active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'} after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-full after:scale-x-0 after:bg-primary after:transition-transform after:origin-left ${active ? 'after:scale-x-100' : 'hover:after:scale-x-100'}`}
+                  >
+                    {link.label}
+                  </Link>
+                )
+              })}
             </div>
           </div>
 
@@ -102,7 +106,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-2 md:space-x-4">
             {/* Cart (redirects to login if not authenticated) */}
             <Link href="/cart" className="relative" onClick={handleCartClick} aria-label="Cart">
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative hover:bg-primary/10 dark:hover:bg-primary/20">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
@@ -121,7 +125,7 @@ export default function Navbar() {
             {/* Auth Section */}
             {isAuthenticated ? (
               <div className="relative">
-                <Button variant="ghost" size="icon" aria-haspopup="menu" aria-expanded={accountOpen} onClick={() => setAccountOpen((v) => !v)}>
+                <Button variant="ghost" size="icon" aria-haspopup="menu" aria-expanded={accountOpen} onClick={() => setAccountOpen((v) => !v)} className="hover:bg-primary/10 dark:hover:bg-primary/20">
                   <User className="h-5 w-5" />
                 </Button>
                 {accountOpen && (
@@ -164,12 +168,12 @@ export default function Navbar() {
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/auth/login">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="font-semibold hover:text-primary">
                     Login
                   </Button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button size="sm">
+                  <Button size="sm" className="font-semibold">
                     Register
                   </Button>
                 </Link>
@@ -180,7 +184,7 @@ export default function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="md:hidden hover:bg-primary/10 dark:hover:bg-primary/20"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

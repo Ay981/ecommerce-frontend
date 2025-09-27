@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useMemo } from 'react'
 import Link from 'next/link'
 import { useGetProductsQuery, useGetCategoriesQuery, type Product } from '@/lib/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
@@ -9,6 +9,7 @@ import Layout from '@/components/layout/Layout'
 import { useToast } from '@/components/providers/ToastProvider'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useAddToCartMutation } from '@/lib/api'
 
 function ProductsPageInner() {
@@ -23,7 +24,7 @@ function ProductsPageInner() {
   
   const [page, setPage] = useState(1)
   const pageSize = 12
-  const { data: productResp, isLoading: productsLoading, error: productsError } = useGetProductsQuery({
+  const { data: productResp, isLoading: productsLoading, error: productsError, isFetching } = useGetProductsQuery({
     categoryId: selectedCategory || undefined,
     search: searchTerm || undefined,
     page,
@@ -52,15 +53,7 @@ function ProductsPageInner() {
     }
   }
 
-  if (productsLoading || categoriesLoading) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
-    )
-  }
+  const products: Product[] = useMemo(() => Array.isArray(productResp) ? productResp as unknown as Product[] : (productResp?.results ?? []), [productResp])
 
   if (productsError) {
     // Try to auto-correct invalid page error from DRF
@@ -121,66 +114,67 @@ function ProductsPageInner() {
           </div>
         </div>
 
-        {/* Products Grid */}
-        {(() => {
-          // Normalize response: support both old array shape and new paginated object
-          const products: Product[] = Array.isArray(productResp)
-            ? productResp as unknown as Product[]
-            : (productResp?.results ?? [])
-          return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
-            <div key={product.id} className="bg-card rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border">
-              <Link href={`/products/${product.id}`}>
-                <div className="aspect-w-1 aspect-h-1 bg-muted">
-                  <div className="w-full h-48 bg-muted flex items-center justify-center">
-                    <span className="text-muted-foreground">No Image</span>
-                  </div>
-                </div>
-              </Link>
-
-              <div className="p-4">
-                <Link href={`/products/${product.id}`}>
-                  <h3 className="text-lg font-semibold text-foreground mb-2 hover:text-primary">
-                    {product.name}
-                  </h3>
-                </Link>
-
-                <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
-                  {product.description}
-                </p>
-
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-2xl font-bold text-primary">
-                    ${product.price.toFixed(2)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    Stock: {product.stock_quantity}
-                  </span>
-                </div>
-
-                <Button
-                  onClick={() => handleAddToCart(product)}
-                  disabled={product.stock_quantity === 0}
-                  className="w-full"
-                >
-                  {product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
-                </Button>
+        {/* Products Grid / Loading State */}
+        <div className="relative">
+          {isFetching && (
+            <div className="absolute inset-0 bg-background/70 backdrop-blur-sm z-10 hidden md:flex items-center justify-center">
+              <div className="flex gap-4">
+                <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <span className="text-sm text-muted-foreground">Updating…</span>
               </div>
             </div>
-              ))}
-            </div>
-          )
-        })()}
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {(productsLoading || categoriesLoading) && products.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-card rounded-lg border p-4 space-y-3">
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                <div className="flex items-center justify-between pt-2">
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="h-6 w-16" />
+                </div>
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+            {products.map(product => (
+              <div key={product.id} className="group bg-card rounded-lg shadow-sm hover:shadow-md transition-all border overflow-hidden">
+                <Link href={`/products/${product.id}`}> 
+                  <div className="relative h-48 w-full bg-gradient-to-br from-muted to-muted/60 grid place-items-center">
+                    <span className="text-muted-foreground text-xs group-hover:scale-105 transition-transform">No Image</span>
+                  </div>
+                </Link>
+                <div className="p-4 flex flex-col gap-3">
+                  <Link href={`/products/${product.id}`}> 
+                    <h3 className="text-base font-semibold tracking-tight line-clamp-1 hover:text-primary transition-colors">{product.name}</h3>
+                  </Link>
+                  <p className="text-muted-foreground text-xs line-clamp-2 min-h-[32px]">{product.description}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-primary">${product.price.toFixed(2)}</span>
+                    <span className="text-[11px] text-muted-foreground">Stock: {product.stock_quantity}</span>
+                  </div>
+                  <Button
+                    onClick={() => handleAddToCart(product)}
+                    disabled={product.stock_quantity === 0}
+                    className="w-full"
+                  >
+                    {product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        {(!productResp || (Array.isArray(productResp) ? (productResp as unknown as Product[]).length === 0 : (productResp.results ?? []).length === 0)) && (
+  {(!productsLoading && products.length === 0) && (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg">No products found.</p>
           </div>
         )}
 
         {/* Pagination */}
-        {(!Array.isArray(productResp)) && productResp && productResp.count > pageSize && (
+  {(!Array.isArray(productResp)) && productResp && productResp.count > pageSize && products.length > 0 && (
           <div className="flex items-center justify-center gap-4 mt-10">
             <Button
               variant="outline"

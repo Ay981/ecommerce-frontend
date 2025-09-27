@@ -72,8 +72,8 @@ function LoginPageInner() {
 
           {/* Right Form */}
           <div className="max-w-md w-full mx-auto">
-            <h1 className="text-3xl font-bold mb-2">Log in to Exclusive</h1>
-            <p className="text-muted-foreground mb-8">Enter your details below</p>
+            <h1 className="text-3xl font-bold mb-6 inline-block pb-2 border-b border-border">Log in</h1>
+            <p className="text-sm text-muted-foreground mb-8">Enter your details below</p>
 
             {(error || fieldErrors.length > 0) && (
               <div className="mb-6 space-y-2">
@@ -131,7 +131,13 @@ function LoginPageInner() {
                 <Link href="#" className="text-red-600 hover:underline">Forgot Password?</Link>
               </div>
 
-              <Button type="submit" size="lg" disabled={isLoading} className="w-full">
+              <Button
+                type="submit"
+                size="lg"
+                disabled={isLoading}
+                variant="outline"
+                className="w-full border-2 border-primary/70 text-primary font-semibold tracking-wide hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 focus-visible:ring-primary"
+              >
                 {isLoading ? 'Logging in…' : 'Log in'}
               </Button>
 

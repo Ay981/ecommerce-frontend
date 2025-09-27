@@ -71,8 +71,8 @@ export default function RegisterPage() {
 
           {/* Right Form */}
           <div className="max-w-md w-full mx-auto">
-            <h1 className="text-3xl font-bold mb-2">Create an account</h1>
-            <p className="text-muted-foreground mb-8">Enter your details below</p>
+            <h1 className="text-3xl font-bold mb-6 inline-block pb-2 border-b border-border">Create account</h1>
+            <p className="text-sm text-muted-foreground mb-8">Enter your details below</p>
 
             {(error || fieldErrors.length > 0) && (
               <div className="mb-6 space-y-2">
@@ -127,7 +127,13 @@ export default function RegisterPage() {
                   className="mt-1 block w-full px-3 py-2 text-sm shadow-sm form-input-base form-input-placeholder form-input-focus" placeholder="••••••••" />
               </div>
 
-              <Button type="submit" size="lg" disabled={isLoading} className="w-full">
+              <Button
+                type="submit"
+                size="lg"
+                disabled={isLoading}
+                variant="outline"
+                className="w-full border-2 border-primary/70 text-primary font-semibold tracking-wide hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 focus-visible:ring-primary"
+              >
                 {isLoading ? 'Creating account…' : 'Create Account'}
               </Button>
 
