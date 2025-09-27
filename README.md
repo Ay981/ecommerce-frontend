@@ -1,6 +1,11 @@
-# 🛍️ Modern E-Commerce Frontend
+# 🛍️ E‑Commerce Frontend (Next.js App Router)
 
-A sophisticated e-commerce frontend built with Next.js 14, featuring modern design, dark mode, internationalization, and seamless user experience.
+Production‑ready Next.js 15 (App Router) storefront with TypeScript, Tailwind, i18n, theming, and RTK Query data layer. Supports two modes:
+
+1. Real backend mode (Django REST API at `NEXT_PUBLIC_API_BASE_URL`)
+2. Mock mode (in‑memory data for local UX / rapid prototyping)
+
+> The backend register/login endpoints are currently returning 500 (server issue). Frontend gracefully surfaces this. Once backend responds with JSON (201/400) no frontend changes are required.
 
 ## ✨ Features
 
@@ -22,16 +27,16 @@ A sophisticated e-commerce frontend built with Next.js 14, featuring modern desi
 - **Responsive Design**: Mobile-first approach with seamless desktop experience
 - **Accessibility**: WCAG compliant with proper contrast ratios and keyboard navigation
 
-### 🛒 **E-Commerce Features**
-- **User Authentication**: Registration, login, and secure session management
-- **Product Catalog**: Browse products with search, filtering, and categorization
-- **Shopping Cart**: Add/remove items with real-time quantity updates
-- **Order Management**: Complete checkout flow and order tracking
-- **Responsive UI**: Optimized for all device sizes
+### 🛒 **Commerce Layer**
+- **Auth (email + password)**: With JWT (SimpleJWT expected). Auto-login after successful register (when backend returns tokens or user object).
+- **Products & Categories**: Normalization layer maps backend fields (e.g. `stock` → `stock_quantity`).
+- **Cart (Mock / Local)**: Fully functional in mock mode; ready for API wiring.
+- **Orders (Mock)**: Client-side only until backend endpoints are available.
+- **Retry + Error Normalization**: Distinguishes network vs HTML 500 vs JSON validation errors.
 
 ## 🚀 Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 15 (App Router / Turbopack)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4 with custom design tokens
 - **State Management**: Redux Toolkit + RTK Query
@@ -41,19 +46,17 @@ A sophisticated e-commerce frontend built with Next.js 14, featuring modern desi
 - **Animations**: Framer Motion
 - **UI Components**: Custom component library with variants
 
-## 📁 Project Structure
+## 📁 Project Structure (abridged)
 
 ```
 src/
 ├── app/
-│   ├── [locale]/              # Internationalized routes
-│   │   ├── auth/              # Authentication pages
-│   │   ├── products/          # Product pages
-│   │   ├── categories/        # Category pages
-│   │   ├── cart/              # Shopping cart
-│   │   ├── checkout/          # Checkout flow
-│   │   ├── orders/            # Order management
-│   │   └── layout.tsx         # Locale-specific layout
+│   ├── [locale]/              # i18n routes (fallback to default)
+│   ├── auth/                  # Auth pages (login/register)
+│   ├── products/              # Product listing + details
+│   ├── categories/            # Category listing + details
+│   ├── cart/                  # Cart page (mock data persistence per session)
+│   ├── orders/                # Mock order history
 │   ├── globals.css            # Global styles and design tokens
 │   └── layout.tsx             # Root layout
 ├── components/
@@ -163,10 +166,22 @@ cd ecommerce-frontend
 npm install
 ```
 
-3. **Set up environment variables**
+3. **Set up environment variables** (create `.env.local`):
 ```bash
-# Create .env.local file
+# Base backend URL (no trailing slash)
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+
+# Use mock data (true/false)
+NEXT_PUBLIC_USE_MOCKS=true
+
+# Route all API calls via internal proxy (avoids CORS): /api/proxy/... (recommended if backend lacks CORS headers)
+NEXT_PUBLIC_USE_API_PROXY=false
+
+# Optional verbose API logging (console)
+NEXT_PUBLIC_LOG_API=false
+
+# (Server-side only) expose /api/backend-ping in non-dev
+# ENABLE_BACKEND_PING=true
 ```
 
 4. **Run the development server**
@@ -180,9 +195,13 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 ## 🔧 Configuration
 
 ### Environment Variables
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL | `http://localhost:8000` |
+| Variable | Scope | Description | Default |
+|----------|-------|-------------|---------|
+| `NEXT_PUBLIC_API_BASE_URL` | client | Backend base (no trailing slash) | `http://localhost:8000` |
+| `NEXT_PUBLIC_USE_MOCKS` | client | Use in-memory mock data | `false` |
+| `NEXT_PUBLIC_USE_API_PROXY` | client | Force same-origin proxy `/api/proxy` | `false` |
+| `NEXT_PUBLIC_LOG_API` | client | Enable verbose API request/error logs | `false` |
+| `ENABLE_BACKEND_PING` | server | Allow `/api/backend-ping` in prod/staging | *(unset)* |
 
 ### Theme Configuration
 The theme system is configured in `src/components/providers/ThemeProvider.tsx`:
@@ -196,6 +215,22 @@ The theme system is configured in `src/components/providers/ThemeProvider.tsx`:
 - **Supported Locales**: en, es, fr
 - **Fallback**: Falls back to default locale for missing translations
 - **Routing**: All routes are prefixed with locale (e.g., `/en/products`)
+
+## 🔐 Proxy Strategy
+
+When `NEXT_PUBLIC_USE_API_PROXY=true`, the RTK Query base URL becomes `/api/proxy/api/v1`. The edge/server route forwards to `$NEXT_PUBLIC_API_BASE_URL/api/v1/...`, rewriting redirects and following limited hops. This avoids CORS issues and hides backend host from the browser network panel.
+
+Disable the proxy only if the backend adds proper CORS headers (e.g. via `django-cors-headers`).
+
+## 🧱 Error Handling
+
+`src/lib/errors.ts` normalizes:
+- Network / DNS vs CORS / generic fetch failures
+- HTML 500 pages mislabelled as JSON (reported as “unexpected (non‑JSON) response”)
+- Field validation arrays → user friendly labels
+- Known auth error messages → friendly text
+
+Retries: transient `FETCH_ERROR` gets exponential backoff (2 attempts).
 
 ## 📱 Responsive Design
 
@@ -219,13 +254,9 @@ The theme system is configured in `src/components/providers/ThemeProvider.tsx`:
 - **Caching**: RTK Query caching for API responses
 - **Prefetching**: Intelligent link prefetching
 
-### Lighthouse Scores
-- **Performance**: 95+
-- **Accessibility**: 100
-- **Best Practices**: 95+
-- **SEO**: 100
+> Run `npx next build && npx next start` then Lighthouse locally for real metrics; sample scores not included to avoid misleading claims.
 
-## 🧪 Testing
+## 🧪 Testing (Add as Needed)
 
 ### Available Scripts
 - `npm run dev` - Start development server
@@ -248,11 +279,12 @@ npm run build
 npm run start
 ```
 
-### Environment Setup
-1. Set production API URL
-2. Configure CDN for static assets
-3. Set up monitoring and analytics
-4. Configure error tracking
+### Environment Setup Checklist
+1. `NEXT_PUBLIC_API_BASE_URL` points to production backend (HTTPS)
+2. Decide: enable proxy (`NEXT_PUBLIC_USE_API_PROXY=true`) or configure backend CORS
+3. Set `NEXT_PUBLIC_USE_MOCKS=false`
+4. Leave `NEXT_PUBLIC_LOG_API=false` (enable temporarily for debugging only)
+5. Optional: enable monitoring / analytics (not bundled)
 
 ### Deployment Platforms
 - **Vercel**: Recommended for Next.js applications
@@ -287,4 +319,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ using Next.js, TypeScript, and modern web technologies.**
+**Built with ❤️ using Next.js, TypeScript, Tailwind, RTK Query, and modern web tooling.**
