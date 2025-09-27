@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useGetProductsQuery, useGetCategoriesQuery, type Product } from '@/lib/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
@@ -11,7 +11,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { useAddToCartMutation } from '@/lib/api'
 
-export default function ProductsPage() {
+function ProductsPageInner() {
   const dispatch = useAppDispatch()
   const { isAuthenticated } = useAppSelector(s => s.auth)
   const [addToCart] = useAddToCartMutation()
@@ -205,5 +205,13 @@ export default function ProductsPage() {
         )}
       </div>
     </Layout>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center">Loading products...</div>}>
+      <ProductsPageInner />
+    </Suspense>
   )
 }
