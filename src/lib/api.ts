@@ -801,7 +801,7 @@ export const api = createApi({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
         // Send product_id and quantity as payload
-      body: { product: body.product, quantity: body.quantity },
+         body: { product: body.product_id, quantity: body.quantity },
       }),
       invalidatesTags: ['Cart'],
     }),
