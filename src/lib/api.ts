@@ -776,9 +776,9 @@ export const api = createApi({
       invalidatesTags: ['Order'],
     }),
 
-    // Cart endpoints
-    getCart: builder.query<CartResponse, string>({
-      query: (id) => (USE_MOCKS ? '/cart/' : `/shop/cart/${id}/`),
+    // Cart endpoint (single resource)
+    getCart: builder.query<CartResponse, void>({
+      query: () => (USE_MOCKS ? '/cart' : '/shop/cart/'),
       providesTags: ['Cart'],
     }),
     // Cart Items endpoints
