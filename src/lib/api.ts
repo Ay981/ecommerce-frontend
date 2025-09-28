@@ -674,12 +674,20 @@ export const api = createApi({
       invalidatesTags: ['Product'],
     }),
 
-    // Orders endpoints
-    getOrders: builder.query<Order[], void>({
-      query: () => '/orders/',
-      transformResponse: (resp: unknown): Order[] => {
-        interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
-        interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
+    // Orders endpoints (paginated list)
+    getOrders: builder.query<{ results: Order[]; count: number }, { page?: number; pageSize?: number }>({
+      query: ({ page = 1, pageSize = 20 }) =>
+        USE_MOCKS
+          ? `/orders?page=${page}&page_size=${pageSize}`
+          : `/shop/orders/?page=${page}&page_size=${pageSize}`,
+      transformResponse: (raw: unknown) => {
+        // raw shape: { count, results: RawOrder[] }
+        const obj = raw as { count?: unknown; results?: unknown }
+        const count = typeof obj.count === 'number' ? obj.count : 0
+        const list = Array.isArray(obj.results) ? (obj.results as unknown[]) : []
+        // Reuse existing mapping logic for individual orders
+        type RawOrderItem = { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
+        type RawOrder = { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
         const mapStatus = (s: unknown): Order['status'] => {
           if (s === 'pending' || s === 'completed' || s === 'failed') return s
           if (s === 'success') return 'completed'
@@ -694,22 +702,21 @@ export const api = createApi({
             id: String(o.id ?? ''),
             user_id: String(o.user_id ?? o.user ?? ''),
             status: mapStatus(o.status),
-            total_amount: typeof o.total_amount === 'number' ? o.total_amount as number : Number(o.total_price ?? 0),
+            total_amount: typeof o.total_amount === 'number' ? o.total_amount : Number(o.total_price ?? 0),
             shipping_address: String(o.shipping_address ?? ''),
             created_at: String(o.created_at ?? ''),
             updated_at: String(o.updated_at ?? ''),
             items: itemsRaw.map(it => ({
               id: String(it.id ?? ''),
               order_id: String(it.order_id ?? o.id ?? ''),
-              product_id: String(it.product_id ?? ((it.product as { id?: unknown }|undefined)?.id) ?? ''),
+              product_id: String(it.product_id ?? ((it.product as { id?: unknown } | undefined)?.id) ?? ''),
               quantity: Number(it.quantity ?? 0),
               price: Number(it.price ?? 0),
               product: (it.product ?? {}) as Product,
             })),
           }
         }
-        if (Array.isArray(resp)) return (resp as RawOrder[]).map(mapOrder)
-        return []
+        return { count, results: list.map(item => mapOrder(item as RawOrder)) }
       },
       providesTags: ['Order'],
     }),
