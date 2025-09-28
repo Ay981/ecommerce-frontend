@@ -31,22 +31,22 @@ export default function HomeLanding() {
         await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
         addToast({ title: 'Added to cart', message: `${product.name} was added to your cart.` })
       } catch (err) {
-        console.error('Home addToCart error:', err)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const e = err as any
-        const status = e.status ?? 'Error'
-        const orig = e.originalStatus ? `/${e.originalStatus}` : ''
-        // Extract <h1> content from HTML error, fallback to raw data
+        // Use HTTP status code if available
+        const httpStatus = e.originalStatus ?? e.status ?? 'Error'
+        // Extract <h1> from HTML error or fallback to raw data
         let detail = 'Unknown error'
         if (typeof e.data === 'string') {
           const match = e.data.match(/<h1>(.*?)<\/h1>/)
           detail = match ? match[1] : e.data
         }
-        const errorText = e.error ?? detail
+        // Prefer extracted detail over parse error message
+        const errorText = typeof e.data === 'string' ? detail : e.error ?? String(e.data)
         addToast({
           variant: 'error',
           title: 'Add to Cart Failed',
-          message: `Could not add "${product.name}" to cart - ${status}${orig}: ${errorText}`,
+          message: `Could not add "${product.name}" to cart - ${httpStatus}: ${errorText}`,
         })
       }
     } else {
