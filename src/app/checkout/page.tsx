@@ -14,7 +14,7 @@ export default function CheckoutPage() {
   const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
   const { isAuthenticated } = useAppSelector((state) => state.auth)
   // fetch server cart when authenticated
-  const { data: serverCart, isFetching } = useGetCartQuery(undefined, { skip: !isAuthenticated })
+  const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
   const [createOrderMutation, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
   
@@ -23,14 +23,14 @@ export default function CheckoutPage() {
     firstName: string
     companyName: string
     streetAddress: string
-    apartment: string
-    city: string
+    // fetch server cart when authenticated
+    const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
     phone: string
     email: string
-    saveInfo: boolean
+      ? serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || []
   }
-  const [formData, setFormData] = useState<FormData>({
-    firstName: '',
+    const baseTotal = isAuthenticated
+      ? serverCart?.items.reduce((sum, it) => sum + it.product.price * it.quantity, 0) || 0
     companyName: '',
     streetAddress: '',
     apartment: '',
@@ -81,7 +81,7 @@ export default function CheckoutPage() {
       const orderData = isAuthenticated
         ? {
             shipping_address,
-            // Use server cart items
+            // Send server cart items
             items: serverCart?.items.map(it => ({ product_id: it.product.id, quantity: it.quantity })) || [],
             payment_method: paymentMethod,
             coupon_code: couponApplied ? couponCode : undefined,
