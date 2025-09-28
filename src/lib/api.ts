@@ -834,11 +834,11 @@ export const api = createApi({
       providesTags: (result, error, id) => [{ type: 'Cart', id }],
     }),
     createCartItem: builder.mutation<ServerCartItem, { product_id: string; quantity: number }>({
-      query: (body) => ({
+      query: ({ product_id, quantity }) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // API expects product_id and quantity
-        body,
+        // DRF serializer expects `product` field for the product ID and `quantity`
+        body: { product: product_id, quantity },
       }),
       // Convert returned product.price from string to number
       transformResponse: (raw: { id: string | number; product: { id: string | number; name: string; price: string }; quantity: number }): ServerCartItem => ({
