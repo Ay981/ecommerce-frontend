@@ -13,11 +13,23 @@ export default function CheckoutPage() {
   const dispatch = useAppDispatch()
   const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
   const { isAuthenticated } = useAppSelector((state) => state.auth)
+  // fetch server cart when authenticated
   const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
   const [createOrderMutation, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
   
-  const [formData, setFormData] = useState({
+  // form fields type
+  interface FormData {
+    firstName: string
+    companyName: string
+    streetAddress: string
+    apartment: string
+    city: string
+    phone: string
+    email: string
+    saveInfo: boolean
+  }
+  const [formData, setFormData] = useState<FormData>({
     firstName: '',
     companyName: '',
     streetAddress: '',
@@ -32,39 +44,19 @@ export default function CheckoutPage() {
   const [couponApplied, setCouponApplied] = useState(false)
   const [error, setError] = useState('')
 
-  // Redirect effects (avoid calling router during render)
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/auth/login')
-    }
-  }, [isAuthenticated, router])
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      if (localItems.length === 0) router.replace('/cart')
-      return
-    }
-    // authenticated path: wait for serverCart to load
-    if (serverCart && serverCart.items.length === 0) {
+    if (!isAuthenticated && localItems.length === 0) {
       router.replace('/cart')
     }
-  }, [isAuthenticated, localItems.length, serverCart, router])
+  }, [isAuthenticated, localItems.length, router])
 
   const effectiveItems = isAuthenticated
-    ? (serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || [])
+    ? serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || []
     : localItems
   const baseTotal = isAuthenticated
-    ? (serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0)
+    ? serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0
     : localTotal
-
-  // While deciding redirects, suppress full UI
-  if (!isAuthenticated || (effectiveItems.length === 0 && (!isAuthenticated || serverCart))) {
-    return (
-      <Layout>
-        <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Redirecting...</div>
-      </Layout>
-    )
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,7 +81,8 @@ export default function CheckoutPage() {
       const orderData = isAuthenticated
         ? {
             shipping_address,
-            items: [], // server will derive items from authenticated cart
+            // Send server cart items
+            items: serverCart?.items.map(it => ({ product_id: it.product.id, quantity: it.quantity })) || [],
             payment_method: paymentMethod,
             coupon_code: couponApplied ? couponCode : undefined,
           }
