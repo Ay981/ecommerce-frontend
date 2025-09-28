@@ -123,7 +123,7 @@ export interface CreateOrderRequest {
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
 // IMPORTANT: Provide NEXT_PUBLIC_API_BASE_URL in your .env.* (see .env.example). Fallback keeps local dev functional.
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '')
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:10000').replace(/\/+$/, '')
 const USE_API_PROXY = process.env.NEXT_PUBLIC_USE_API_PROXY === 'true'
 const LOG_API = process.env.NEXT_PUBLIC_LOG_API === 'true'
 
