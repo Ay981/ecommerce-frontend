@@ -1,6 +1,6 @@
 'use client'
 
-import { useGetProductsQuery, type Product, useAddToCartMutation } from '@/lib/api'
+import { useGetProductsQuery, type Product, useCreateCartItemMutation } from '@/lib/api'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { addItem } from '@/lib/features/cart/cartSlice'
 import { ProductCard } from '@/components/ui/ProductCard'
@@ -11,7 +11,7 @@ export default function BestSellers({ onAddToCartAction }: { onAddToCartAction?:
   const { data: productsResp } = useGetProductsQuery({ page: 1, pageSize: 50 })
   const top = (productsResp?.results || []).slice(0, 8)
   const { isAuthenticated } = useAppSelector(s => s.auth)
-  const [addToCart] = useAddToCartMutation()
+  const [addToCart] = useCreateCartItemMutation()
   const dispatch = useAppDispatch()
 
   const handleAdd = async (p: Product) => {
