@@ -784,7 +784,7 @@ export const api = createApi({
     }),
 
     // Cart endpoint (single resource) - retrieve by cart ID
-    getCart: builder.query<CartResponse, string>({
+  getCart: builder.query<CartResponse, string | void>({
       query: (id) => (USE_MOCKS
         ? '/cart'
         : `/shop/cart/${id}/`
