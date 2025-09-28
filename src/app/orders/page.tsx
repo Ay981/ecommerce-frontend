@@ -51,7 +51,7 @@ export default function OrdersPage() {
           <p className="text-muted-foreground">View your order history and track your shipments</p>
         </div>
 
-        {orders?.length === 0 ? (
+  {orders?.results.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📦</div>
             <h2 className="text-2xl font-bold text-foreground mb-4">No orders yet</h2>
@@ -65,7 +65,7 @@ export default function OrdersPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {orders?.map((order) => (
+            {orders?.results.map((order) => (
               <div key={order.id} className="bg-card border rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
