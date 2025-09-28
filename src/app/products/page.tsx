@@ -45,14 +45,26 @@ function ProductsPageInner() {
         await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
         addToast({ title: 'Added to cart', message: `${product.name} added to cart.` })
       } catch (err) {
-        // Log raw error for debugging
         console.error('Add to Cart error:', err)
-        // Serialize error for detail
-        const detail = JSON.stringify(err)
+        // Extract relevant fields and parse HTML <h1> if present
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const e = err as any
+        const status = e.status ?? 'Error'
+        const orig = e.originalStatus ? `/${e.originalStatus}` : ''
+        let errorText = ''
+        if (e.error) {
+          errorText = e.error
+        } else if (typeof e.data === 'string') {
+          const match = e.data.match(/<h1>([^<]+)<\/h1>/)
+          errorText = match ? match[1] : e.data
+        } else {
+          errorText = 'Unknown error'
+        }
+        const toastMsg = `${status}${orig}: ${errorText}`
         addToast({
           variant: 'error',
           title: 'Add to Cart Failed',
-          message: `Could not add "${product.name}" to cart: ${detail}`,
+          message: `Could not add "${product.name}" to cart - ${toastMsg}`,
         })
       }
     } else {

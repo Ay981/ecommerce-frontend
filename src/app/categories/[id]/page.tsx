@@ -42,11 +42,15 @@ export default function CategoryDetailPage() {
         addToast({ title: 'Added to cart', message: `${product.name} added to cart.` })
       } catch (err) {
         console.error('Category addToCart error:', err)
-        const detail = JSON.stringify(err)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const e = err as any
+        const status = e.status ?? 'Error'
+        const orig = e.originalStatus ? `/${e.originalStatus}` : ''
+        const errorText = e.error ?? (typeof e.data === 'string' && e.data) ?? 'Unknown error'
         addToast({
           variant: 'error',
           title: 'Add to Cart Failed',
-          message: `Could not add "${product.name}" to cart: ${detail}`,
+          message: `Could not add "${product.name}" to cart - ${status}${orig}: ${errorText}`,
         })
       }
     } else {
