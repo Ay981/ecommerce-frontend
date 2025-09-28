@@ -797,11 +797,20 @@ export const api = createApi({
       providesTags: ['Cart'],
     }),
     // Cart Items endpoints
-  getCartItems: builder.query<{ results: ServerCartItem[]; count: number; page: number; page_size: number }, { page?: number; pageSize?: number }>({
+  getCartItems: builder.query<{ results: ServerCartItem[]; count: number }, { page?: number; pageSize?: number }>({
       query: ({ page = 1, pageSize = 20 }) => (USE_MOCKS
           ? `/cart-items?page=${page}&page_size=${pageSize}`
         : `/shop/cart-items/?page=${page}&page_size=${pageSize}`
       ),
+      transformResponse: (raw: { count: number; results: Array<{ id: string | number; product: Product & { price: string }; quantity: number }> }) => ({
+        count: raw.count,
+        results: raw.results.map(it => ({
+          id: String(it.id),
+          product_id: String(it.product.id),
+          quantity: it.quantity,
+          product: { ...it.product, price: Number(it.product.price) } as Product,
+        })),
+      }),
       providesTags: ['Cart'],
     }),
   getCartItem: builder.query<ServerCartItem, string>({
@@ -815,6 +824,13 @@ export const api = createApi({
         // API expects product_id and quantity
         body,
       }),
+      // Convert returned product.price from string to number
+      transformResponse: (raw: { id: string | number; product: { id: string | number; name: string; price: string }; quantity: number }): ServerCartItem => ({
+        id: String(raw.id),
+        product_id: String(raw.product.id),
+        quantity: raw.quantity,
+        product: { ...raw.product, price: Number(raw.product.price) },
+      }),
       invalidatesTags: ['Cart'],
     }),
   updateCartItem: builder.mutation<ServerCartItem, { id: string; data: Partial<{ product_id: string; quantity: number }> }>({
@@ -823,6 +839,13 @@ export const api = createApi({
         method: 'PATCH',
     // API expects product_id and/or quantity
     body: data,
+      }),
+      // Convert returned product.price from string to number
+      transformResponse: (raw: { id: string | number; product: { id: string | number; name: string; price: string }; quantity: number }): ServerCartItem => ({
+        id: String(raw.id),
+        product_id: String(raw.product.id),
+        quantity: raw.quantity,
+        product: { ...raw.product, price: Number(raw.product.price) },
       }),
       invalidatesTags: (res, err, { id }) => [{ type: 'Cart', id }],
     }),
