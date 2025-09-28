@@ -834,12 +834,12 @@ export const api = createApi({
       query: (id) => (USE_MOCKS ? `/cart-items/${id}` : `/shop/cart-items/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Cart', id }],
     }),
-    createCartItem: builder.mutation<ServerCartItem, { product_id: string; quantity: number }>({
+    createCartItem: builder.mutation<ServerCartItem, { product_id: number; quantity: number }>({
       query: ({ product_id, quantity }) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // Send `product_id` as number, not string, per DRF expectation
-        body: { product_id: Number(product_id), quantity },
+        // Send numeric product_id and quantity per API spec
+        body: { product_id, quantity },
       }),
       // Convert returned product.price from string to number
       transformResponse: (raw: { id: string | number; product: { id: string | number; name: string; price: string }; quantity: number }): ServerCartItem => ({
@@ -859,15 +859,12 @@ export const api = createApi({
       }),
       invalidatesTags: ['Cart'],
     }),
-  updateCartItem: builder.mutation<ServerCartItem, { id: string; data: Partial<{ product_id: string; quantity: number }> }>({
+  updateCartItem: builder.mutation<ServerCartItem, { id: string; data: Partial<{ product_id: number; quantity: number }> }>({
       query: ({ id, data }) => ({
         url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
         method: 'PATCH',
-        // Ensure product_id is a number if provided
-        body: {
-          ...(data.quantity !== undefined && { quantity: data.quantity }),
-          ...(data.product_id !== undefined && { product_id: Number(data.product_id) }),
-        },
+        // Send numeric fields per API spec
+        body: data,
       }),
       // Convert returned product.price from string to number
       transformResponse: (raw: { id: string | number; product: { id: string | number; name: string; price: string }; quantity: number }): ServerCartItem => ({
