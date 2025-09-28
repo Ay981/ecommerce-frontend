@@ -41,7 +41,10 @@ function LoginPageInner() {
       // Attempt merge: sequentially add each local cart item to server cart
       for (const item of localCartItems) {
         try {
-          await addToCart({ product_id: item.product.id, quantity: item.quantity }).unwrap()
+          await addToCart({
+            product_id: Number(item.product.id),
+            quantity: item.quantity,
+          }).unwrap()
         } catch {/* ignore individual failures */}
       }
       addToast({ variant: 'success', title: 'Welcome back', message: 'You are now logged in.' })
