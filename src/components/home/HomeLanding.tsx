@@ -36,7 +36,13 @@ export default function HomeLanding() {
         const e = err as any
         const status = e.status ?? 'Error'
         const orig = e.originalStatus ? `/${e.originalStatus}` : ''
-        const errorText = e.error ?? (typeof e.data === 'string' && e.data) ?? 'Unknown error'
+        // Extract <h1> content from HTML error, fallback to raw data
+        let detail = 'Unknown error'
+        if (typeof e.data === 'string') {
+          const match = e.data.match(/<h1>(.*?)<\/h1>/)
+          detail = match ? match[1] : e.data
+        }
+        const errorText = e.error ?? detail
         addToast({
           variant: 'error',
           title: 'Add to Cart Failed',
