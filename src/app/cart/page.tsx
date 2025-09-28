@@ -9,17 +9,22 @@ import Layout from '@/components/layout/Layout'
 export default function CartPage() {
   const dispatch = useAppDispatch()
   const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
-  const { isAuthenticated } = useAppSelector(s => s.auth)
+  const { isAuthenticated } = useAppSelector((state) => state.auth)
+
+  // Fetch server cart when authenticated
   const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
   const [updateCartItem] = useUpdateCartItemMutation()
   const [deleteCartItem] = useDeleteCartItemMutation()
 
-  type DisplayItem = { product: typeof localItems[number]['product']; quantity: number; id?: string }
-  const items: DisplayItem[] = isAuthenticated
-    ? (serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity, id: it.id })) || [])
-    : localItems
-  const total = isAuthenticated ? (serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0) : localTotal
+  // Determine items to display and total price
+  const items = isAuthenticated
+    ? serverCart?.items.map((it) => ({ product: it.product, quantity: it.quantity, id: it.id })) || []
+    : localItems.map((it) => ({ product: it.product, quantity: it.quantity, id: undefined }))
+  const total = isAuthenticated
+    ? serverCart?.items.reduce((sum, it) => sum + it.product.price * it.quantity, 0) || 0
+    : localTotal
 
+  // Handle quantity changes
   const handleQuantityChange = (productId: string, quantity: number, itemId?: string) => {
     if (isAuthenticated && itemId) {
       updateCartItem({ id: itemId, data: { quantity } })
@@ -28,6 +33,7 @@ export default function CartPage() {
     }
   }
 
+  // Handle item removal
   const handleRemoveItem = (productId: string, itemId?: string) => {
     if (isAuthenticated && itemId) {
       deleteCartItem({ id: itemId })
@@ -36,6 +42,7 @@ export default function CartPage() {
     }
   }
 
+  // Empty cart state
   if (items.length === 0) {
     return (
       <Layout>
@@ -43,11 +50,8 @@ export default function CartPage() {
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🛒</div>
             <h1 className="text-3xl font-bold text-foreground mb-4">Your cart is empty</h1>
-            <p className="text-muted-foreground mb-8">Looks like you haven&apos;t added any items to your cart yet.</p>
-            <Link
-              href="/products"
-              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors"
-            >
+            <p className="text-muted-foreground mb-8">Looks like you haven’t added any items to your cart yet.</p>
+            <Link href="/products" className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors">
               Continue Shopping
             </Link>
           </div>
@@ -56,6 +60,7 @@ export default function CartPage() {
     )
   }
 
+  // Cart with items
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
@@ -70,7 +75,7 @@ export default function CartPage() {
             <div className="bg-card border rounded-lg shadow-md overflow-hidden">
               <div className="divide-y">
                 {items.map((item) => (
-                  <div key={item.id ? `${item.product.id}-${item.id}` : item.product.id} className="p-6">
+                  <div key={item.id ?? item.product.id} className="p-6">
                     <div className="flex items-center space-x-4">
                       {/* Product Image */}
                       <div className="flex-shrink-0">
@@ -81,10 +86,7 @@ export default function CartPage() {
 
                       {/* Product Details */}
                       <div className="flex-1 min-w-0">
-                        <Link
-                          href={`/products/${item.product.id}`}
-                          className="text-lg font-medium text-foreground hover:text-blue-600"
-                        >
+                        <Link href={`/products/${item.product.id}`} className="text-lg font-medium text-foreground hover:text-blue-600">
                           {item.product.name}
                         </Link>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -113,7 +115,7 @@ export default function CartPage() {
                         </button>
                       </div>
 
-                      {/* Subtotal */}
+                      {/* Subtotal and Remove */}
                       <div className="text-right">
                         <p className="text-lg font-semibold text-foreground">
                           ${(item.product.price * item.quantity).toFixed(2)}
@@ -136,7 +138,6 @@ export default function CartPage() {
           <div className="lg:col-span-1">
             <div className="bg-card border rounded-lg shadow-md p-6 sticky top-6">
               <h2 className="text-xl font-semibold text-foreground mb-4">Order Summary</h2>
-              
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
@@ -157,18 +158,10 @@ export default function CartPage() {
                   </div>
                 </div>
               </div>
-
-              <Link
-                href="/checkout"
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors text-center block font-medium"
-              >
+              <Link href="/checkout" className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors text-center block font-medium">
                 Proceed to Checkout
               </Link>
-
-              <Link
-                href="/products"
-                className="w-full border bg-background text-foreground py-3 px-4 rounded-md hover:bg-accent transition-colors text-center block font-medium mt-3"
-              >
+              <Link href="/products" className="w-full border bg-background text-foreground py-3 px-4 rounded-md hover:bg-accent transition-colors text-center block font-medium mt-3">
                 Continue Shopping
               </Link>
             </div>
