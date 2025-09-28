@@ -119,6 +119,13 @@ export interface CreateOrderRequest {
   coupon_code?: string
 }
 
+// API response shape for GET /shop/cart/{id}/
+interface RawCartResponse {
+  id: string | number
+  cart_items: Array<{ id: string | number; product: Product; quantity: number }>
+  total_price: string | number
+}
+
 // Get API base URL from environment
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
@@ -777,11 +784,22 @@ export const api = createApi({
     }),
 
     // Cart endpoint (single resource) - retrieve by cart ID
-    getCart: builder.query<CartResponse, void>({
-      query: () => (USE_MOCKS
+    getCart: builder.query<CartResponse, string>({
+      query: (id) => (USE_MOCKS
         ? '/cart'
-        : '/shop/cart/1/'
+        : `/shop/cart/${id}/`
       ),
+      // Map API response { cart_items, total_price } to our CartResponse
+      transformResponse: (raw: RawCartResponse): CartResponse => ({
+        id: String(raw.id),
+        items: raw.cart_items.map(it => ({
+          id: String(it.id),
+          product_id: String(it.product.id),
+          quantity: it.quantity,
+          product: it.product,
+        })),
+        total_amount: Number(raw.total_price),
+      }),
       providesTags: ['Cart'],
     }),
     // Cart Items endpoints
