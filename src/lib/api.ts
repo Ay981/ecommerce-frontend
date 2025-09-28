@@ -777,29 +777,41 @@ export const api = createApi({
     }),
 
     // Cart endpoints
-    getCart: builder.query<CartResponse, void>({
-      query: () => '/cart/',
+    getCart: builder.query<CartResponse, string>({
+      query: (id) => (USE_MOCKS ? '/cart/' : `/shop/cart/${id}/`),
       providesTags: ['Cart'],
     }),
-    addToCart: builder.mutation<CartResponse, { product_id: string; quantity?: number }>({
+    // Cart Items endpoints
+    getCartItems: builder.query<{ results: CartItem[]; count: number; page: number; page_size: number }, { page?: number; pageSize?: number }>({
+      query: ({ page = 1, pageSize = 20 }) => (USE_MOCKS
+        ? `/cart-items?page=${page}&page_size=${pageSize}`
+        : `/shop/cart-items/?page=${page}&page_size=${pageSize}`
+      ),
+      providesTags: ['Cart'],
+    }),
+    getCartItem: builder.query<CartItem, string>({
+      query: (id) => (USE_MOCKS ? `/cart-items/${id}` : `/shop/cart-items/${id}/`),
+      providesTags: (result, error, id) => [{ type: 'Cart', id }],
+    }),
+    createCartItem: builder.mutation<CartItem, { product_id: string; quantity: number }>({
       query: (body) => ({
-        url: '/cart/add/',
+        url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
         body,
       }),
       invalidatesTags: ['Cart'],
     }),
-    updateCartItem: builder.mutation<CartResponse, { item_id: string; quantity: number }>({
-      query: ({ item_id, quantity }) => ({
-        url: `/cart/item/${item_id}/`,
-        method: 'PUT',
-        body: { quantity },
+    updateCartItem: builder.mutation<CartItem, { id: string; data: Partial<{ product_id: string; quantity: number }> }>({
+      query: ({ id, data }) => ({
+        url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
+        method: 'PATCH',
+        body: data,
       }),
-      invalidatesTags: ['Cart'],
+      invalidatesTags: (res, err, { id }) => [{ type: 'Cart', id }],
     }),
-    removeCartItem: builder.mutation<CartResponse, { item_id: string }>({
-      query: ({ item_id }) => ({
-        url: `/cart/item/${item_id}/`,
+    deleteCartItem: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Cart'],
@@ -828,4 +840,9 @@ export const {
   useAddToCartMutation,
   useUpdateCartItemMutation,
   useRemoveCartItemMutation,
+  useGetCartItemsQuery,
+  useGetCartItemQuery,
+  useCreateCartItemMutation,
+  useUpdateCartItemMutation,
+  useDeleteCartItemMutation,
 } = api
