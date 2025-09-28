@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useGetCategoryQuery, useGetProductsQuery, type Product, useAddToCartMutation } from '@/lib/api'
+import { useGetCategoryQuery, useGetProductsQuery, type Product, useCreateCartItemMutation } from '@/lib/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { addItem } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
@@ -15,7 +15,7 @@ export default function CategoryDetailPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const { isAuthenticated } = useAppSelector(s => s.auth)
-  const [addToCart] = useAddToCartMutation()
+  const [addToCart] = useCreateCartItemMutation()
   const [searchTerm, setSearchTerm] = useState('')
   
   const { data: category, isLoading: categoryLoading } = useGetCategoryQuery(params.id as string)

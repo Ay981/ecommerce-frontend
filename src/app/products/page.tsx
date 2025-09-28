@@ -10,12 +10,12 @@ import { useToast } from '@/components/providers/ToastProvider'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { useAddToCartMutation } from '@/lib/api'
+import { useCreateCartItemMutation } from '@/lib/api'
 
 function ProductsPageInner() {
   const dispatch = useAppDispatch()
   const { isAuthenticated } = useAppSelector(s => s.auth)
-  const [addToCart] = useAddToCartMutation()
+  const [addToCart] = useCreateCartItemMutation()
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const searchParams = useSearchParams()
   const router = useRouter()
