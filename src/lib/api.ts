@@ -542,7 +542,7 @@ export const api = createApi({
 
     // Categories endpoints
     getCategories: builder.query<Category[], void>({
-      query: () => (USE_MOCKS ? '/categories' : '/categories/'),
+      query: () => (USE_MOCKS ? '/categories' : '/shop/categories/'),
       transformResponse: (resp: unknown): Category[] => {
         if (Array.isArray(resp)) return resp as Category[]
         if (resp && typeof resp === 'object' && 'results' in resp) {
@@ -554,7 +554,7 @@ export const api = createApi({
       providesTags: ['Category'],
     }),
     getCategory: builder.query<Category, string>({
-      query: (id) => (USE_MOCKS ? `/categories/${id}` : `/categories/${id}/`),
+      query: (id) => (USE_MOCKS ? `/categories/${id}` : `/shop/categories/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Category', id }],
     }),
 
@@ -570,7 +570,7 @@ export const api = createApi({
         params.append('page', String(page))
         // Retain pageSize only for mock pagination simulation (do NOT send to real backend)
         if (useMocks) params.append('page_size', String(pageSize))
-  return useMocks ? `/products?${params.toString()}` : `/products/?${params.toString()}`
+  return useMocks ? `/products?${params.toString()}` : `/shop/products/?${params.toString()}`
       },
       // Transform backend response to ensure products have stock_quantity
       transformResponse: (response: unknown): { results: Product[]; count: number; page: number; page_size: number } => {
@@ -624,7 +624,7 @@ export const api = createApi({
       providesTags: ['Product'],
     }),
     getProduct: builder.query<Product, string>({
-      query: (id) => (USE_MOCKS ? `/products/${id}` : `/products/${id}/`),
+      query: (id) => (USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`),
       transformResponse: (raw: unknown): Product => {
         interface RawProduct { id?: unknown; name?: unknown; description?: unknown; price?: unknown; stock?: unknown; stock_quantity?: unknown; category_id?: unknown; category?: unknown; created_at?: unknown; updated_at?: unknown }
         const r = (raw || {}) as RawProduct
@@ -651,7 +651,7 @@ export const api = createApi({
     }),
     createProduct: builder.mutation<Product, Partial<Product>>({
       query: (body) => ({
-        url: USE_MOCKS ? '/products' : '/products/',
+        url: USE_MOCKS ? '/products' : '/shop/products/',
         method: 'POST',
         body,
       }),
@@ -659,7 +659,7 @@ export const api = createApi({
     }),
     updateProduct: builder.mutation<Product, { id: string; data: Partial<Product> }>({
       query: ({ id, data }) => ({
-        url: USE_MOCKS ? `/products/${id}` : `/products/${id}/`,
+        url: USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`,
         method: 'PATCH',
         body: data,
       }),
@@ -667,7 +667,7 @@ export const api = createApi({
     }),
     deleteProduct: builder.mutation<{ success: boolean }, { id: string }>({
       query: ({ id }) => ({
-        url: USE_MOCKS ? `/products/${id}` : `/products/${id}/`,
+        url: USE_MOCKS ? `/products/${id}` : `/shop/products/${id}/`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Product'],
