@@ -675,8 +675,8 @@ export const api = createApi({
     }),
 
     // Orders endpoints (paginated list)
-    getOrders: builder.query<{ results: Order[]; count: number }, { page?: number; pageSize?: number }>({
-      query: ({ page = 1, pageSize = 20 }) =>
+    getOrders: builder.query<{ results: Order[]; count: number }, { page?: number; pageSize?: number } | void>({
+      query: ({ page = 1, pageSize = 20 } = {}) =>
         USE_MOCKS
           ? `/orders?page=${page}&page_size=${pageSize}`
           : `/shop/orders/?page=${page}&page_size=${pageSize}`,
