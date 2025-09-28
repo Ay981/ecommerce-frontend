@@ -13,7 +13,7 @@ export default function CheckoutPage() {
   const dispatch = useAppDispatch()
   const { items: localItems, total: localTotal } = useAppSelector(state => state.cart)
   const { isAuthenticated } = useAppSelector(state => state.auth)
-  const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
+  const { data: serverCart, isLoading: isCartLoading } = useGetCartQuery(undefined, { skip: !isAuthenticated, refetchOnMountOrArgChange: true })
   const [createOrder, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
 
@@ -21,8 +21,8 @@ export default function CheckoutPage() {
   const effectiveItems = isAuthenticated && serverCart
     ? serverCart.items.map(item => ({ product: item.product, quantity: item.quantity }))
     : localItems
-  const baseTotal = isAuthenticated && serverCart
-    ? serverCart.total_amount
+  const baseTotal = isAuthenticated
+    ? (serverCart ? serverCart.total_amount : 0)
     : localTotal
 
   // Form state
@@ -203,7 +203,9 @@ export default function CheckoutPage() {
             <div className="space-y-2 border-t pt-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">${baseTotal.toFixed(2)}</span>
+                <span className="font-medium">
+                  {isAuthenticated && isCartLoading ? 'Loading...' : `$${baseTotal.toFixed(2)}`}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
@@ -211,7 +213,9 @@ export default function CheckoutPage() {
               </div>
               <div className="border-t pt-3 flex justify-between text-base font-semibold">
                 <span>Total</span>
-                <span>${baseTotal.toFixed(2)}</span>
+                <span className="font-medium">
+                  {isAuthenticated && isCartLoading ? 'Loading...' : `$${baseTotal.toFixed(2)}`}
+                </span>
               </div>
             </div>
 
