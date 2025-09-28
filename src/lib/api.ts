@@ -121,11 +121,12 @@ export interface CreateOrderRequest {
 
 
 // Get API base URL from environment
-
+// IMPORTANT: Provide NEXT_PUBLIC_API_BASE_URL in your .env.* (see .env.example).
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
-// IMPORTANT: Provide NEXT_PUBLIC_API_BASE_URL in your .env.* (see .env.example). Fallback keeps local dev functional.
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:10000').replace(/\/+$/, '')
-const USE_API_PROXY = process.env.NEXT_PUBLIC_USE_API_PROXY === 'true'
+// No fallback: require NEXT_PUBLIC_API_BASE_URL to be set
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '')
+// Enable internal Next.js proxy in dev or when explicitly set
+const USE_API_PROXY = process.env.NEXT_PUBLIC_USE_API_PROXY === 'true' || process.env.NODE_ENV === 'development'
 const LOG_API = process.env.NEXT_PUBLIC_LOG_API === 'true'
 
 if (LOG_API) console.info('[API CONFIG]', { USE_MOCKS, API_BASE_URL, USE_API_PROXY })
