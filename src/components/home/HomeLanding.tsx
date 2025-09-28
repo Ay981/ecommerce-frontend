@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useGetProductsQuery, useGetCategoriesQuery, type Product, useAddToCartMutation } from '@/lib/api'
+import { useGetProductsQuery, useGetCategoriesQuery, type Product, useCreateCartItemMutation } from '@/lib/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { addItem } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
@@ -23,7 +23,7 @@ export default function HomeLanding() {
   const { data: categories } = useGetCategoriesQuery()
   const { addToast } = useToast()
   const { isAuthenticated } = useAppSelector(s => s.auth)
-  const [addToCart] = useAddToCartMutation()
+  const [addToCart] = useCreateCartItemMutation()
 
   const handleAddToCart = async (product: Product) => {
     if (isAuthenticated) {

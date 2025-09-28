@@ -4,9 +4,8 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
-import { useLoginMutation } from '@/lib/api'
+import { useLoginMutation, useCreateCartItemMutation } from '@/lib/api'
 import { setCredentials } from '@/lib/features/auth/authSlice'
-import { useAddToCartMutation } from '@/lib/api'
 import Layout from '@/components/layout/Layout'
 import { AuthIllustration } from '@/components/auth/AuthIllustration'
 import { useToast } from '@/components/providers/ToastProvider'
@@ -17,7 +16,7 @@ function LoginPageInner() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const [loginMutation, { isLoading }] = useLoginMutation()
-  const [addToCart] = useAddToCartMutation()
+  const [addToCart] = useCreateCartItemMutation()
   const localCartItems = useAppSelector(s => s.cart.items)
   const { addToast } = useToast()
   const searchParams = useSearchParams()
