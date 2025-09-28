@@ -22,7 +22,7 @@ export default function CartPage() {
 
   const handleQuantityChange = (productId: string, quantity: number, itemId?: string) => {
     if (isAuthenticated && itemId) {
-      updateCartItem({ item_id: itemId, quantity })
+      updateCartItem({ id: itemId, data: { quantity } })
     } else {
       dispatch(updateQuantity({ productId, quantity }))
     }
