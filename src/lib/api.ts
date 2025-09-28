@@ -749,40 +749,12 @@ export const api = createApi({
       },
       providesTags: (result, error, id) => [{ type: 'Order', id }],
     }),
-    createOrder: builder.mutation<Order, CreateOrderRequest>({
-      query: (orderData) => ({
-        url: '/orders/',
+    createOrder: builder.mutation<Order, void>({
+      query: () => ({
+        url: '/shop/orders/',
         method: 'POST',
-        body: orderData,
       }),
-      transformResponse: (o: unknown): Order => {
-        interface RawOrderItem { id?: unknown; order_id?: unknown; product_id?: unknown; quantity?: unknown; price?: unknown; product?: unknown }
-        interface RawOrder { id?: unknown; user_id?: unknown; user?: unknown; status?: unknown; total_amount?: unknown; total_price?: unknown; shipping_address?: unknown; created_at?: unknown; updated_at?: unknown; items?: unknown }
-        const raw = o as RawOrder
-        const itemsRaw = Array.isArray(raw.items) ? (raw.items as RawOrderItem[]) : []
-        return {
-          id: String(raw.id ?? ''),
-          user_id: String(raw.user_id ?? raw.user ?? ''),
-          status: (raw.status === 'pending' || raw.status === 'completed' || raw.status === 'failed')
-            ? (raw.status as Order['status'])
-            : raw.status === 'success'
-              ? 'completed'
-              : 'pending',
-          total_amount: typeof raw.total_amount === 'number' ? raw.total_amount as number : Number(raw.total_price ?? 0),
-          shipping_address: String(raw.shipping_address ?? ''),
-          created_at: String(raw.created_at ?? ''),
-          updated_at: String(raw.updated_at ?? ''),
-          items: itemsRaw.map(it => ({
-            id: String(it.id ?? ''),
-            order_id: String(it.order_id ?? raw.id ?? ''),
-            product_id: String(it.product_id ?? ((it.product as { id?: unknown }|undefined)?.id) ?? ''),
-            quantity: Number(it.quantity ?? 0),
-            price: Number(it.price ?? 0),
-            product: (it.product ?? {}) as Product,
-          })),
-        }
-      },
-      invalidatesTags: ['Order'],
+      invalidatesTags: ['Cart', 'Order'],
     }),
 
     // Cart endpoint (single resource) - retrieve current user's cart

@@ -1,262 +1,371 @@
 'use client'
 
-import { useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAppSelector, useAppDispatch } from '@/lib/hooks'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { useGetCartQuery, useCreateOrderMutation } from '@/lib/api'
 import { clearCart } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
 import { useToast } from '@/components/providers/ToastProvider'
 
+type CheckoutForm = {
+  firstName: string
+  lastName: string
+  company: string
+  address: string
+  address2: string
+  city: string
+  phone: string
+  email: string
+  notes: string
+  paymentMethod: 'bank' | 'cod'
+  coupon: string
+}
+
+type NormalizedItem = {
+  key: string
+  productId: string | number
+  name: string
+  price: number
+  quantity: number
+}
+
+type ServerCartItem = {
+  id?: number | string
+  quantity?: number
+  product_id?: number | string
+  product?: {
+    id?: number | string
+    name?: string
+    price?: number | string
+  }
+  product_price?: number | string
+}
+
+const initialForm: CheckoutForm = {
+  firstName: '',
+  lastName: '',
+  company: '',
+  address: '',
+  address2: '',
+  city: '',
+  phone: '',
+  email: '',
+  notes: '',
+  paymentMethod: 'bank',
+  coupon: '',
+}
+
+const toNumber = (value: unknown) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const { items: localItems, total: localTotal } = useAppSelector(state => state.cart)
-  const { isAuthenticated } = useAppSelector(state => state.auth)
-  const { data: serverCart, isLoading: isCartLoading } = useGetCartQuery(undefined, { skip: !isAuthenticated, refetchOnMountOrArgChange: true })
-  const [createOrder, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
+  const { items: localItems } = useAppSelector((state) => state.cart)
+  const { isAuthenticated } = useAppSelector((state) => state.auth)
 
-  // Determine which items and total to display
-  const effectiveItems = isAuthenticated && serverCart
-    ? serverCart.items.map(item => ({ product: item.product, quantity: item.quantity }))
-    : localItems
-  const baseTotal = isAuthenticated
-    ? (serverCart ? serverCart.total_amount : 0)
-    : localTotal
-
-  // Form state
-  const [formData, setFormData] = useState({
-    firstName: '',
-    companyName: '',
-    streetAddress: '',
-    apartment: '',
-    city: '',
-    phone: '',
-    email: '',
-    saveInfo: false,
+  const {
+    data: serverCart,
+    isLoading: cartLoading,
+    isFetching: cartFetching,
+  } = useGetCartQuery(undefined, {
+    skip: !isAuthenticated,
+    refetchOnMountOrArgChange: true,
   })
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type, checked } = e.target as HTMLInputElement
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
-  }
+  const [createOrder, { isLoading }] = useCreateOrderMutation()
+  const [form, setForm] = useState<CheckoutForm>(initialForm)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    // Basic validation
-    const { firstName, streetAddress, city, phone, email } = formData
-    if (!firstName || !streetAddress || !city || !phone || !email) {
-      addToast({ variant: 'error', message: 'Please fill in all required fields.' })
+  const effectiveItems = useMemo<NormalizedItem[]>(() => {
+    if (isAuthenticated) {
+      const items: ServerCartItem[] = Array.isArray(serverCart?.items)
+        ? (serverCart!.items as ServerCartItem[])
+        : []
+      return items.map((item) => {
+        const product = item.product ?? {}
+        return {
+          key: String(item.id ?? product.id ?? crypto.randomUUID()),
+          productId: product.id ?? item.product_id ?? '',
+          name: product.name ?? 'Product',
+          price: toNumber(product.price ?? item.product_price),
+          quantity: item.quantity ?? 0,
+        }
+      })
+    }
+
+    return localItems.map((item) => ({
+      key: String(item.product.id),
+      productId: item.product.id,
+      name: item.product.name,
+      price: toNumber(item.product.price),
+      quantity: item.quantity,
+    }))
+  }, [isAuthenticated, serverCart, localItems])
+
+  const subtotal = useMemo(
+    () =>
+      effectiveItems.reduce((sum, item) => {
+        const price = Number(item.price)
+        return sum + (Number.isFinite(price) ? price : 0) * item.quantity
+      }, 0),
+    [effectiveItems],
+  )
+
+  const subtotalDisplay =
+    isAuthenticated && (cartLoading || cartFetching) ? '—' : `$${subtotal.toFixed(2)}`
+
+  const onChange =
+    (field: keyof CheckoutForm) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const rawValue =
+        field === 'paymentMethod'
+          ? (event.target as HTMLInputElement).value
+          : event.target.value
+
+      const nextValue =
+        field === 'paymentMethod'
+          ? (rawValue as CheckoutForm['paymentMethod'])
+          : rawValue
+
+      setForm((prev) => ({ ...prev, [field]: nextValue }))
+    }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!effectiveItems.length) {
+      addToast({
+        variant: 'error',
+        title: 'Cart empty',
+        message: 'Add items before checking out.',
+      })
       return
     }
-    // Build items payload
-    const itemsPayload = effectiveItems.map(it => ({ product_id: it.product.id, quantity: it.quantity }))
+
     try {
-      await createOrder({
-        shipping_address: [
-          firstName + (formData.companyName ? `, ${formData.companyName}` : ''),
-          streetAddress,
-          formData.apartment || undefined,
-          city,
-          `Phone: ${phone}`,
-          `Email: ${email}`,
-        ].filter(Boolean).join('\n'),
-        items: itemsPayload,
-        payment_method: 'bank',
-        coupon_code: undefined,
-      }).unwrap()
+      const order = await createOrder().unwrap()
+
       if (!isAuthenticated) dispatch(clearCart())
-      addToast({ variant: 'success', message: 'Order placed successfully' })
-      router.push('/orders') // or `/orders/${order.id}` if returned
-    } catch {
-      addToast({ variant: 'error', message: 'Failed to place order' })
+
+      addToast({
+        variant: 'success',
+        title: 'Order placed',
+        message: 'Thank you for your purchase!',
+      })
+      router.push(`/orders/${order.id ?? ''}`)
+    } catch (error) {
+      console.error(error)
+      addToast({
+        variant: 'error',
+        title: 'Checkout failed',
+        message: 'Please verify your details and try again.',
+      })
     }
   }
+
+  const isSummaryLoading = isAuthenticated && (cartLoading || cartFetching)
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-4 lg:px-0">
-        <div className="mb-8">
-          <h1 className="text-2xl lg:text-3xl font-bold mb-2">Checkout</h1>
-          <p className="text-muted-foreground">Complete your order</p>
-        </div>
+      <div className="mx-auto max-w-6xl px-4 py-12">
+        <h1 className="text-3xl font-semibold text-white">Checkout</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Complete your order</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-10">
-          {/* Billing Details */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-xl font-semibold mb-6">Billing Details</h2>
-
-            <form id="checkout-form" onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 gap-5">
-                <div>
-                  <label className="mb-1 block text-sm">First Name*</label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    placeholder="Your name"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm">Company Name</label>
-                  <input
-                    type="text"
-                    name="companyName"
-                    value={formData.companyName}
-                    onChange={handleInputChange}
-                    placeholder="Optional"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm">Street Address*</label>
-                  <input
-                    type="text"
-                    name="streetAddress"
-                    value={formData.streetAddress}
-                    onChange={handleInputChange}
-                    placeholder="House number and street name"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm">Apartment, floor, etc. (optional)</label>
-                  <input
-                    type="text"
-                    name="apartment"
-                    value={formData.apartment}
-                    onChange={handleInputChange}
-                    placeholder="Apartment, suite, unit"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm">Town/City*</label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    placeholder="City"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm">Phone Number*</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="e.g. +1 555 000 1111"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm">Email Address*</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="you@example.com"
-                    className="w-full px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-                  />
-                </div>
-                <label className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    name="saveInfo"
-                    checked={formData.saveInfo}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 accent-blue-600"
-                  />
-                  <span>Save this information for faster check-out next time</span>
-                </label>
-              </div>
-
-            </form>
-          </div>
-
-          {/* Order Summary */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
-
-            <div className="space-y-4 mb-4">
-              {effectiveItems.map(item => (
-                <div key={item.product.id} className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
-                    IMG
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{item.product.name}</div>
-                    <div className="text-xs text-muted-foreground">Qty: {item.quantity}</div>
-                  </div>
-                  <div className="text-sm font-medium">${(item.product.price * item.quantity).toFixed(2)}</div>
-                </div>
-              ))}
+        <div className="mt-10 grid gap-8 lg:grid-cols-[2fr,1fr]">
+          <form
+            id="checkout-form"
+            onSubmit={handleSubmit}
+            className="rounded-xl border border-white/10 bg-white/5 p-6"
+          >
+            <h2 className="text-lg font-medium text-white">Billing Details</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-muted-foreground">First Name*</span>
+                <input
+                  required
+                  value={form.firstName}
+                  onChange={onChange('firstName')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Your first name"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-muted-foreground">Last Name*</span>
+                <input
+                  required
+                  value={form.lastName}
+                  onChange={onChange('lastName')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Your last name"
+                />
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm text-muted-foreground">Company Name</span>
+                <input
+                  value={form.company}
+                  onChange={onChange('company')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Optional"
+                />
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm text-muted-foreground">Street Address*</span>
+                <input
+                  required
+                  value={form.address}
+                  onChange={onChange('address')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="House number and street name"
+                />
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm text-muted-foreground">Apartment, suite, etc.</span>
+                <input
+                  value={form.address2}
+                  onChange={onChange('address2')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Optional"
+                />
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm text-muted-foreground">Town / City*</span>
+                <input
+                  required
+                  value={form.city}
+                  onChange={onChange('city')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="City"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-muted-foreground">Phone*</span>
+                <input
+                  required
+                  value={form.phone}
+                  onChange={onChange('phone')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="+1 555 000 0000"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-muted-foreground">Email Address*</span>
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={onChange('email')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="you@example.com"
+                />
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm text-muted-foreground">Order Notes</span>
+                <textarea
+                  value={form.notes}
+                  onChange={onChange('notes')}
+                  rows={3}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Add any special instructions"
+                />
+              </label>
             </div>
+          </form>
+          <aside className="rounded-xl border border-white/10 bg-white/5 p-6">
+            <h2 className="text-lg font-medium text-white">Order Summary</h2>
 
-            <div className="space-y-2 border-t pt-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">
-                  {isAuthenticated && isCartLoading ? 'Loading...' : `$${baseTotal.toFixed(2)}`}
-                </span>
+            <div className="mt-6 space-y-4">
+              <div className="space-y-3">
+                {isSummaryLoading && <p className="text-sm text-muted-foreground">Loading cart…</p>}
+                {!isSummaryLoading && !effectiveItems.length && (
+                  <p className="text-sm text-muted-foreground">No items in your cart.</p>
+                )}
+                {!isSummaryLoading &&
+                  effectiveItems.map((item) => (
+                    <div key={item.key} className="flex items-start justify-between text-sm">
+                      <div>
+                        <p className="text-white">{item.name}</p>
+                        <p className="text-muted-foreground">
+                          {item.quantity} × ${item.price.toFixed(2)}
+                        </p>
+                      </div>
+                      <p className="font-medium text-white">
+                        ${(item.price * item.quantity).toFixed(2)}
+                      </p>
+                    </div>
+                  ))}
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipping</span>
-                <span className="font-medium">Free</span>
+
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="font-medium text-white">{subtotalDisplay}</span>
               </div>
-              <div className="border-t pt-3 flex justify-between text-base font-semibold">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Shipping</span>
+                <span className="font-medium text-white">Free</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-white/10 pt-4 text-base font-semibold text-white">
                 <span>Total</span>
-                <span className="font-medium">
-                  {isAuthenticated && isCartLoading ? 'Loading...' : `$${baseTotal.toFixed(2)}`}
+                <span>
+                  {isSummaryLoading ? '—' : `$${subtotal.toFixed(2)}`}
                 </span>
               </div>
             </div>
 
-            {/* Payment methods */}
-            <div className="mt-5">
-              <div className="mb-2 text-sm font-medium">Payment Method</div>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={true}
-                    onChange={() => {}}
-                    className="h-4 w-4 accent-blue-600"
-                  />
-                  Bank
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={false}
-                    onChange={() => {}}
-                    className="h-4 w-4 accent-blue-600"
-                  />
-                  Cash on delivery
-                </label>
+            <div className="mt-6 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-white">Payment Method</p>
+                <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      value="bank"
+                      checked={form.paymentMethod === 'bank'}
+                      onChange={onChange('paymentMethod')}
+                    />
+                    Bank transfer
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      value="cod"
+                      checked={form.paymentMethod === 'cod'}
+                      onChange={onChange('paymentMethod')}
+                    />
+                    Cash on delivery
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-4">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-muted-foreground">Coupon Code</span>
+                <input
+                  value={form.coupon}
+                  onChange={onChange('coupon')}
+                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  placeholder="Enter coupon"
+                />
+              </label>
+
               <button
                 type="submit"
                 form="checkout-form"
-                disabled={isLoading}
-                className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isLoading || isSummaryLoading || !effectiveItems.length}
+                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoading ? 'Processing Order...' : 'Place Order'}
+                {isLoading ? 'Placing order…' : 'Place Order'}
               </button>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </Layout>

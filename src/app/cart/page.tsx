@@ -25,9 +25,23 @@ export default function CartPage() {
     : localTotal
 
   // Handle quantity changes
-  const handleQuantityChange = (productId: string, quantity: number, itemId?: string) => {
+  const handleQuantityChange = async (productId: string, quantity: number, itemId?: string) => {
     if (isAuthenticated && itemId) {
-      updateCartItem({ id: itemId, data: { quantity } })
+      if (quantity <= 0) {
+        await deleteCartItem({ id: itemId }).unwrap()
+        return
+      }
+      const numericId = Number(productId)
+      if (!Number.isFinite(numericId)) return
+      await updateCartItem({
+        id: itemId,
+        data: { product_id: numericId, quantity },
+      }).unwrap()
+      return
+    }
+
+    if (quantity <= 0) {
+      dispatch(removeItem(productId))
     } else {
       dispatch(updateQuantity({ productId, quantity }))
     }
