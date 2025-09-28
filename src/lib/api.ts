@@ -837,7 +837,6 @@ export const api = createApi({
       query: ({ product_id, quantity }) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // DRF serializer expects `product` field for the product ID and `quantity`
         body: { product: product_id, quantity },
       }),
       // Convert returned product.price from string to number
