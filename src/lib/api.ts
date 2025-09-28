@@ -797,6 +797,7 @@ export const api = createApi({
       query: (body) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
+        // Send `product_id` to match backend serializer
         body,
       }),
       invalidatesTags: ['Cart'],
@@ -805,6 +806,7 @@ export const api = createApi({
       query: ({ id, data }) => ({
         url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
         method: 'PATCH',
+        // Send `product_id` and/or `quantity` fields
         body: data,
       }),
       invalidatesTags: (res, err, { id }) => [{ type: 'Cart', id }],

@@ -46,19 +46,25 @@ function ProductsPageInner() {
         addToast({ title: 'Added to cart', message: `${product.name} added to cart.` })
       } catch (err) {
         console.error('Add to Cart error:', err)
-        // Extract relevant fields and parse HTML <h1> if present
+        // Extract relevant fields and prefer HTML <h1> error, include parse error info
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const e = err as any
         const status = e.status ?? 'Error'
         const orig = e.originalStatus ? `/${e.originalStatus}` : ''
-        let errorText = ''
-        if (e.error) {
-          errorText = e.error
-        } else if (typeof e.data === 'string') {
+        let errorText = 'Unknown error'
+        if (typeof e.data === 'string') {
           const match = e.data.match(/<h1>([^<]+)<\/h1>/)
-          errorText = match ? match[1] : e.data
-        } else {
-          errorText = 'Unknown error'
+          if (match) {
+            // Use server HTML error title, append parse error
+            const parseErr = e.error ?? ''
+            errorText = parseErr ? `${match[1]} (${parseErr})` : match[1]
+          } else if (e.error) {
+            errorText = e.error
+          } else {
+            errorText = e.data.trim()
+          }
+        } else if (e.error) {
+          errorText = e.error
         }
         const toastMsg = `${status}${orig}: ${errorText}`
         addToast({
