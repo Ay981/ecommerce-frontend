@@ -796,12 +796,12 @@ export const api = createApi({
       query: (id) => (USE_MOCKS ? `/cart-items/${id}` : `/shop/cart-items/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Cart', id }],
     }),
-    createCartItem: builder.mutation<CartItem, { product: string; quantity: number }>({
-      query: ({ product, quantity }) => ({
+    createCartItem: builder.mutation<CartItem, { product_id: string; quantity: number }>({
+      query: ({ product_id, quantity }) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // Backend expects `product` field for foreign key
-        body: { product, quantity },
+        // API expects `product` as the field name
+        body: { product: product_id, quantity },
       }),
       invalidatesTags: ['Cart'],
     }),
@@ -809,7 +809,7 @@ export const api = createApi({
       query: ({ id, data }) => ({
         url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
         method: 'PATCH',
-        // Only `quantity` is needed for updates
+        // Send only quantity for update
         body: data,
       }),
       invalidatesTags: (res, err, { id }) => [{ type: 'Cart', id }],
