@@ -60,6 +60,18 @@ const cartSlice = createSlice({
       state.total = 0
     },
   },
+  extraReducers: (builder) => {
+    // When server cart items load, clear any guest cart state
+    // Use RTK Query matcher for getCartItems fulfilled
+    builder.addMatcher(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (action: any) => action.type === 'api/executeQuery/fulfilled' && action.meta?.arg.endpointName === 'getCartItems',
+      (state) => {
+        state.items = []
+        state.total = 0
+      }
+    )
+  },
 })
 
 export const { addItem, removeItem, updateQuantity, clearCart } = cartSlice.actions
