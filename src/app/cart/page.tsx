@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { removeItem, updateQuantity } from '@/lib/features/cart/cartSlice'
-import { useGetCartQuery, useUpdateCartItemMutation, useDeleteCartItemMutation } from '@/lib/api'
+import { useGetCartItemsQuery, useUpdateCartItemMutation, useDeleteCartItemMutation } from '@/lib/api'
 import Layout from '@/components/layout/Layout'
 
 export default function CartPage() {
@@ -11,17 +11,17 @@ export default function CartPage() {
   const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
   const { isAuthenticated } = useAppSelector((state) => state.auth)
 
-  // Fetch server cart when authenticated
-  const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
+  // Fetch server cart items when authenticated
+  const { data: cartItemsResp } = useGetCartItemsQuery({ page: 1, pageSize: 100 }, { skip: !isAuthenticated })
   const [updateCartItem] = useUpdateCartItemMutation()
   const [deleteCartItem] = useDeleteCartItemMutation()
 
   // Determine items to display and total price
   const items = isAuthenticated
-    ? serverCart?.items.map((it) => ({ product: it.product, quantity: it.quantity, id: it.id })) || []
+    ? cartItemsResp?.results.map((it) => ({ product: (it as any).product, quantity: it.quantity, id: it.id })) || []
     : localItems.map((it) => ({ product: it.product, quantity: it.quantity, id: undefined }))
   const total = isAuthenticated
-    ? serverCart?.items.reduce((sum, it) => sum + it.product.price * it.quantity, 0) || 0
+    ? cartItemsResp?.results.reduce((sum, it) => sum + (it as any).product.price * it.quantity, 0) || 0
     : localTotal
 
   // Handle quantity changes

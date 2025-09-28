@@ -776,9 +776,12 @@ export const api = createApi({
       invalidatesTags: ['Order'],
     }),
 
-    // Cart endpoint (single resource)
+    // Cart endpoint (single resource) - retrieve by cart ID
     getCart: builder.query<CartResponse, void>({
-      query: () => (USE_MOCKS ? '/cart' : '/shop/cart/'),
+      query: () => (USE_MOCKS
+        ? '/cart'
+        : '/shop/cart/1/'
+      ),
       providesTags: ['Cart'],
     }),
     // Cart Items endpoints
@@ -793,20 +796,20 @@ export const api = createApi({
       query: (id) => (USE_MOCKS ? `/cart-items/${id}` : `/shop/cart-items/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Cart', id }],
     }),
-    createCartItem: builder.mutation<CartItem, { product_id: string; quantity: number }>({
-      query: (body) => ({
+    createCartItem: builder.mutation<CartItem, { product: string; quantity: number }>({
+      query: ({ product, quantity }) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // Send `product_id` to match backend serializer
-        body,
+        // Backend expects `product` field for foreign key
+        body: { product, quantity },
       }),
       invalidatesTags: ['Cart'],
     }),
-    updateCartItem: builder.mutation<CartItem, { id: string; data: Partial<{ product_id: string; quantity: number }> }>({
+    updateCartItem: builder.mutation<CartItem, { id: string; data: Partial<{ quantity: number }> }>({
       query: ({ id, data }) => ({
         url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
         method: 'PATCH',
-        // Send `product_id` and/or `quantity` fields
+        // Only `quantity` is needed for updates
         body: data,
       }),
       invalidatesTags: (res, err, { id }) => [{ type: 'Cart', id }],
