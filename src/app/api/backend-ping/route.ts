@@ -44,7 +44,15 @@ export async function GET() {
     const proxyRegisterOptionsUrl = useProxy ? `${siteOrigin}/api/proxy/api/v1/auth/register/` : null
     const proxyLoginOptionsUrl = useProxy ? `${siteOrigin}/api/proxy/api/v1/auth/login/` : null
 
-  const [products, registerOptions, registerPost, loginOptions, loginPost, proxyRegisterOptions, proxyLoginOptions] = await Promise.all([
+  // Additional checks: categories list and token refresh endpoints
+  const categoriesUrl = `${base}/shop/categories/`
+  const refreshOptionsUrl = `${base}/auth/token/refresh/`
+  const refreshPostUrl = `${base}/auth/token/refresh/`
+  const proxyRefreshOptionsUrl = useProxy ? `${siteOrigin}/api/proxy/api/v1/auth/token/refresh/` : null
+
+  const [products, registerOptions, registerPost, loginOptions, loginPost, proxyRegisterOptions, proxyLoginOptions,
+    categories, refreshOptions, refreshPost, proxyRefreshOptions
+  ] = await Promise.all([
     safeFetch(productsUrl),
     safeFetch(registerOptionsUrl, { method: 'OPTIONS' }, true),
     safeFetch(registerPostUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'ping-temp-'+Date.now()+"@example.com", password: 'Test1234!', username: 'pinguser' }) }),
@@ -52,10 +60,26 @@ export async function GET() {
     safeFetch(loginPostUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'nonexistent_'+Date.now()+"@example.com", password: 'WrongPass123' }) }),
     proxyRegisterOptionsUrl ? safeFetch(proxyRegisterOptionsUrl, { method: 'OPTIONS' }, true) : Promise.resolve({ ok: false, status: null, url: 'proxy-disabled' }),
     proxyLoginOptionsUrl ? safeFetch(proxyLoginOptionsUrl, { method: 'OPTIONS' }, true) : Promise.resolve({ ok: false, status: null, url: 'proxy-disabled' }),
+    safeFetch(categoriesUrl),
+    safeFetch(refreshOptionsUrl, { method: 'OPTIONS' }, true),
+    safeFetch(refreshPostUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh: 'dummy-refresh-token' }) }),
+    proxyRefreshOptionsUrl ? safeFetch(proxyRefreshOptionsUrl, { method: 'OPTIONS' }, true) : Promise.resolve({ ok: false, status: null, url: 'proxy-disabled' }),
   ])
 
   return Response.json({
-    env: { base: base, useProxy },
-    checks: { products, registerOptions, registerPost, loginOptions, loginPost, proxyRegisterOptions, proxyLoginOptions },
+    env: { base, useProxy },
+    checks: {
+      products,
+      registerOptions,
+      registerPost,
+      loginOptions,
+      loginPost,
+      proxyRegisterOptions,
+      proxyLoginOptions,
+      categories,
+      refreshOptions,
+      refreshPost,
+      proxyRefreshOptions,
+    },
   })
 }

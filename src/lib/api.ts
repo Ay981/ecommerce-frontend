@@ -417,11 +417,15 @@ export const api = createApi({
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation<AuthResponse, LoginRequest>({
-      query: (credentials) => ({
-        url: USE_MOCKS ? '/auth/login' : '/auth/login/',
-        method: 'POST',
-        body: credentials,
-      }),
+      query: (credentials) => {
+        const { email, password } = credentials
+        const username = email.includes('@') ? email.split('@')[0] : email
+        return {
+          url: USE_MOCKS ? '/auth/login' : '/auth/login/',
+          method: 'POST',
+          body: { email, password, username },
+        }
+      },
       transformResponse: (resp: unknown): AuthResponse => {
         type JwtLogin = { access?: unknown; refresh?: unknown; access_token?: unknown; token_type?: unknown; user?: unknown }
         const r = (resp || {}) as JwtLogin
@@ -489,7 +493,7 @@ export const api = createApi({
       },
       invalidatesTags: ['User'],
     }),
-    refreshToken: builder.mutation<{ access_token: string; token_type: string }, { refresh: string }>({
+    refreshToken: builder.mutation<{ access_token: string; token_type: string; refresh_token?: string }, { refresh: string }>({
       query: (body) => ({
   // Trailing slash required by DRF default router
   url: '/auth/token/refresh/',
@@ -497,9 +501,22 @@ export const api = createApi({
         body,
       }),
       transformResponse: (r: unknown) => {
-        const obj = (r || {}) as { access_token?: unknown; access?: unknown }
-        if (typeof obj.access_token === 'string') return obj as { access_token: string; token_type: string }
-        if (typeof obj.access === 'string') return { access_token: obj.access, token_type: 'bearer' }
+        const obj = (r || {}) as { access_token?: unknown; access?: unknown; refresh?: unknown }
+        // Accept either camel or simple names; preserve new refresh token if issued
+        if (typeof obj.access_token === 'string') {
+          return {
+            access_token: obj.access_token,
+            token_type: 'bearer',
+            refresh_token: typeof obj.refresh === 'string' ? obj.refresh : undefined,
+          }
+        }
+        if (typeof obj.access === 'string') {
+          return {
+            access_token: obj.access,
+            token_type: 'bearer',
+            refresh_token: typeof obj.refresh === 'string' ? obj.refresh : undefined,
+          }
+        }
         return { access_token: '', token_type: 'bearer' }
       },
     }),

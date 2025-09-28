@@ -56,11 +56,42 @@ export default function RegisterPage() {
         // If login gave no token fallback to manual login route
         addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
         router.push('/auth/login')
-      } catch {
+  } catch {
+        // Diagnostic: attempt a second registration with same email to detect non-persistence.
+        // Only do this silently in dev to avoid spamming backend.
+        if (process.env.NODE_ENV === 'development') {
+          try {
+            const dup = await registerMutation(formData).unwrap()
+            // If duplicate also reports success (access_token or silent user payload) backend likely not persisting.
+            if (dup && (dup.access_token || dup.user)) {
+              addToast({ variant: 'error', title: 'Backend issue', message: 'User creation not being persisted. Backend register endpoint returns success repeatedly for same email.' })
+            }
+          } catch {/* ignore */}
+        }
         addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
         router.push('/auth/login')
       }
     } catch (err) {
+      // Special case: backend returned 201 with empty body (no JSON) causing PARSING_ERROR in RTK Query
+      if (err && typeof err === 'object' && (err as { status?: unknown; data?: unknown }).status === 'PARSING_ERROR' && (err as { data?: unknown }).data === '') {
+        // Treat as successful creation (spec says we should have { email, username } but backend omitted body)
+        try {
+          const loginResp = await loginMutation({ email: formData.email, password: formData.password }).unwrap()
+          if (loginResp.access_token) {
+            dispatch(setCredentials({ user: loginResp.user, token: loginResp.access_token, refreshToken: loginResp.refresh_token }))
+            addToast({ variant: 'success', title: 'Account created', message: 'Signed in automatically.' })
+            router.push('/')
+            return
+          }
+          addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
+          router.push('/auth/login')
+          return
+        } catch {
+          addToast({ variant: 'success', title: 'Account created', message: 'Please log in with your new credentials.' })
+          router.push('/auth/login')
+          return
+        }
+      }
       // If backend returns 500 (server error) give clearer guidance
       if (err && typeof err === 'object' && 'status' in err && (err as { status: unknown }).status === 500) {
         setError('Server error during registration (HTTP 500). The backend is failing internally – likely pending migrations or a database issue. Try again later or contact support.')

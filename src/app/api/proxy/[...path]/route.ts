@@ -16,7 +16,11 @@ async function handleProxy(req: NextRequest, params: { path?: string[] }) {
   if (!backendBase) {
     return new Response(JSON.stringify({ detail: 'Backend base URL not configured.' }), { status: 500, headers: { 'Content-Type':'application/json' } })
   }
-  const pathSegs = params.path || []
+  let pathSegs = params.path || []
+  // Collapse accidental duplicated leading ['api','v1','api','v1'] produced when baseUrl already embeds /api/v1
+  if (pathSegs.length >= 4 && pathSegs[0] === 'api' && pathSegs[1] === 'v1' && pathSegs[2] === 'api' && pathSegs[3] === 'v1') {
+    pathSegs = pathSegs.slice(2)
+  }
   let targetPath = '/' + pathSegs.map(encodeURIComponent).join('/')
   // Preserve trailing slash from original request (Next dynamic route strips it)
   const hadTrailing = req.nextUrl.pathname.endsWith('/')
@@ -65,8 +69,20 @@ async function handleProxy(req: NextRequest, params: { path?: string[] }) {
     }
     // Adjust method semantics: 301/302 switch to GET (browser behavior), 307/308 keep method & body
     if (upstream.status === 301 || upstream.status === 302) {
-      method = 'GET'
-      body = undefined
+      const onlyAddsTrailingSlash = (() => {
+        try {
+          const cur = new URL(currentUrl)
+          const nxt = new URL(nextUrl)
+          return cur.origin === nxt.origin && cur.search === nxt.search && (
+            (cur.pathname.replace(/\/+$/,'') + '/') === nxt.pathname && cur.pathname.replace(/\/+$/,'') === nxt.pathname.replace(/\/+$/,'')
+          )
+        } catch { return false }
+      })()
+      // DRF common redirect (adding missing trailing slash) should not downgrade POST to GET; preserve method & body
+      if (!onlyAddsTrailingSlash) {
+        method = 'GET'
+        body = undefined
+      }
     }
     currentUrl = nextUrl
     // Continue loop to fetch next
