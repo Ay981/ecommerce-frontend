@@ -471,9 +471,20 @@ export const api = createApi({
         }
       },
       transformResponse: (resp: unknown): AuthResponse => {
-        const r = (resp || {}) as { access_token?: unknown }
+        // Possible shapes:
+        // 1. Mock: { access_token, token_type, user }
+        // 2. Real register 201: { email, username }
+        // 3. Future: may include { id }
+        const r = (resp || {}) as { access_token?: unknown; email?: unknown; username?: unknown; id?: unknown }
         if (typeof r.access_token === 'string') return r as unknown as AuthResponse
-        // backend returns user only; force empty token, UI should redirect to login
+        if (typeof r.email === 'string') {
+          const user: User = {
+            id: typeof r.id === 'string' ? r.id : '',
+            email: r.email,
+            username: typeof r.username === 'string' ? r.username : undefined,
+          }
+          return { access_token: '', token_type: 'bearer', user }
+        }
         return { access_token: '', token_type: 'bearer' }
       },
       invalidatesTags: ['User'],
