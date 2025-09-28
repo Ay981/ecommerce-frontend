@@ -785,9 +785,9 @@ export const api = createApi({
       providesTags: ['Cart'],
     }),
     // Cart Items endpoints
-    getCartItems: builder.query<{ results: CartItem[]; count: number; page: number; page_size: number }, { page?: number; pageSize?: number }>({
+  getCartItems: builder.query<{ results: ServerCartItem[]; count: number; page: number; page_size: number }, { page?: number; pageSize?: number }>({
       query: ({ page = 1, pageSize = 20 }) => (USE_MOCKS
-        ? `/cart-items?page=${page}&page_size=${pageSize}`
+          ? `/cart-items?page=${page}&page_size=${pageSize}`
         : `/shop/cart-items/?page=${page}&page_size=${pageSize}`
       ),
       providesTags: ['Cart'],
@@ -797,11 +797,11 @@ export const api = createApi({
       providesTags: (result, error, id) => [{ type: 'Cart', id }],
     }),
     createCartItem: builder.mutation<CartItem, { product_id: string; quantity: number }>({
-      query: ({ product_id, quantity }) => ({
+    query: (body) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // API expects `product` as the field name
-        body: { product: product_id, quantity },
+        // Send product_id and quantity as payload
+      body: { product: body.product, quantity: body.quantity },
       }),
       invalidatesTags: ['Cart'],
     }),
