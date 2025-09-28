@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useGetCategoryQuery, useGetProductsQuery, type Product, useCreateCartItemMutation } from '@/lib/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { addItem } from '@/lib/features/cart/cartSlice'
+import { useToast } from '@/components/providers/ToastProvider'
 import Layout from '@/components/layout/Layout'
 
 export default function CategoryDetailPage() {
@@ -16,6 +17,7 @@ export default function CategoryDetailPage() {
   const dispatch = useAppDispatch()
   const { isAuthenticated } = useAppSelector(s => s.auth)
   const [addToCart] = useCreateCartItemMutation()
+  const { addToast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   
   const { data: category, isLoading: categoryLoading } = useGetCategoryQuery(params.id as string)
@@ -37,9 +39,19 @@ export default function CategoryDetailPage() {
     if (isAuthenticated) {
       try {
         await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
-      } catch {/* noop */}
+        addToast({ title: 'Added to cart', message: `${product.name} added to cart.` })
+      } catch (err) {
+        console.error('Category addToCart error:', err)
+        const detail = JSON.stringify(err)
+        addToast({
+          variant: 'error',
+          title: 'Add to Cart Failed',
+          message: `Could not add "${product.name}" to cart: ${detail}`,
+        })
+      }
     } else {
       dispatch(addItem({ product, quantity: 1 }))
+      addToast({ title: 'Added to cart', message: `${product.name} added to cart.` })
     }
   }
 

@@ -30,8 +30,17 @@ export default function HomeLanding() {
       try {
         await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
         addToast({ title: 'Added to cart', message: `${product.name} was added to your cart.` })
-      } catch {
-        addToast({ variant: 'error', title: 'Error', message: 'Failed adding to cart' })
+      } catch (err) {
+        // Log raw error for debugging
+        console.error('Home addToCart error:', err)
+        // Extract detail if available
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detail = (err as any)?.data?.detail ?? (err as any)?.error ?? (err as any)?.message ?? JSON.stringify(err)
+        addToast({
+          variant: 'error',
+          title: 'Add to Cart Failed',
+          message: `Could not add "${product.name}" to cart: ${detail}`,
+        })
       }
     } else {
       dispatch(addItem({ product, quantity: 1 }))

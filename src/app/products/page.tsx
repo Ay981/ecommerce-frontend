@@ -44,8 +44,16 @@ function ProductsPageInner() {
       try {
         await addToCart({ product_id: product.id, quantity: 1 }).unwrap()
         addToast({ title: 'Added to cart', message: `${product.name} added to cart.` })
-      } catch {
-        addToast({ variant: 'error', title: 'Error', message: 'Failed adding to cart' })
+      } catch (err) {
+        // Log raw error for debugging
+        console.error('Add to Cart error:', err)
+        // Serialize error for detail
+        const detail = JSON.stringify(err)
+        addToast({
+          variant: 'error',
+          title: 'Add to Cart Failed',
+          message: `Could not add "${product.name}" to cart: ${detail}`,
+        })
       }
     } else {
       dispatch(addItem({ product, quantity: 1 }))
