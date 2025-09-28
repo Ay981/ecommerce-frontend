@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
-import { useGetCartQuery, useCreateOrderMutation } from '@/lib/api'
+import { useGetCartItemsQuery, useCreateOrderMutation } from '@/lib/api'
 import { clearCart } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
 import { useToast } from '@/components/providers/ToastProvider'
@@ -40,6 +40,7 @@ type ServerCartItem = {
     price?: number | string
   }
   product_price?: number | string
+  price?: number | string
 }
 
 const initialForm: CheckoutForm = {
@@ -73,29 +74,27 @@ export default function CheckoutPage() {
   const { isAuthenticated } = useAppSelector((state) => state.auth)
 
   const {
-    data: serverCart,
+    data: serverCartItems,
     isLoading: cartLoading,
     isFetching: cartFetching,
-  } = useGetCartQuery(undefined, {
-    skip: !isAuthenticated,
-    refetchOnMountOrArgChange: true,
-  })
+  } = useGetCartItemsQuery(
+    { page: 1, pageSize: 100 },
+    { skip: !isAuthenticated, refetchOnMountOrArgChange: true },
+  )
 
   const [createOrder, { isLoading }] = useCreateOrderMutation()
   const [form, setForm] = useState<CheckoutForm>(initialForm)
 
   const effectiveItems = useMemo<NormalizedItem[]>(() => {
     if (isAuthenticated) {
-      const items: ServerCartItem[] = Array.isArray(serverCart?.items)
-        ? (serverCart!.items as ServerCartItem[])
-        : []
+      const items = serverCartItems?.results ?? []
       return items.map((item) => {
         const product = item.product ?? {}
         return {
           key: String(item.id ?? product.id ?? crypto.randomUUID()),
           productId: product.id ?? item.product_id ?? '',
           name: product.name ?? 'Product',
-          price: toNumber(product.price ?? item.product_price),
+          price: toNumber(product.price),
           quantity: item.quantity ?? 0,
         }
       })
@@ -108,7 +107,7 @@ export default function CheckoutPage() {
       price: toNumber(item.product.price),
       quantity: item.quantity,
     }))
-  }, [isAuthenticated, serverCart, localItems])
+  }, [isAuthenticated, serverCartItems, localItems])
 
   const subtotal = useMemo(
     () =>
@@ -150,17 +149,25 @@ export default function CheckoutPage() {
       return
     }
 
-    try {
-      const order = await createOrder().unwrap()
+    if (!isAuthenticated) {
+      addToast({
+        variant: 'error',
+        title: 'Sign in required',
+        message: 'Please log in before placing an order.',
+      })
+      router.push('/auth/login?next=/checkout')
+      return
+    }
 
-      if (!isAuthenticated) dispatch(clearCart())
+    try {
+      await createOrder().unwrap()
 
       addToast({
         variant: 'success',
         title: 'Order placed',
         message: 'Thank you for your purchase!',
       })
-      router.push(`/orders/${order.id ?? ''}`)
+      router.push('/orders')
     } catch (error) {
       console.error(error)
       addToast({
@@ -359,7 +366,7 @@ export default function CheckoutPage() {
               <button
                 type="submit"
                 form="checkout-form"
-                disabled={isLoading || isSummaryLoading || !effectiveItems.length}
+                disabled={isLoading || isSummaryLoading || !effectiveItems.length || !isAuthenticated}
                 className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoading ? 'Placing order…' : 'Place Order'}

@@ -749,7 +749,7 @@ export const api = createApi({
       },
       providesTags: (result, error, id) => [{ type: 'Order', id }],
     }),
-    createOrder: builder.mutation<Order, void>({
+    createOrder: builder.mutation<void, void>({
       query: () => ({
         url: '/shop/orders/',
         method: 'POST',
