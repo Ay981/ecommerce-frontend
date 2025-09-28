@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
-import { useCreateOrderMutation, useGetCartQuery } from '@/lib/api'
+import { useGetCartQuery, useCreateOrderMutation } from '@/lib/api'
 import { clearCart } from '@/lib/features/cart/cartSlice'
 import Layout from '@/components/layout/Layout'
 import { useToast } from '@/components/providers/ToastProvider'
@@ -11,26 +11,23 @@ import { useToast } from '@/components/providers/ToastProvider'
 export default function CheckoutPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
-  const { isAuthenticated } = useAppSelector((state) => state.auth)
-  // fetch server cart when authenticated
+  const { items: localItems, total: localTotal } = useAppSelector(state => state.cart)
+  const { isAuthenticated } = useAppSelector(state => state.auth)
   const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
-  const [createOrderMutation, { isLoading }] = useCreateOrderMutation()
+  const [createOrder, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
-  
-  // form fields type
-  interface FormData {
-    firstName: string
-    companyName: string
-    streetAddress: string
-    // fetch server cart when authenticated
-    const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
-    phone: string
-    email: string
-      ? serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || []
-  }
-    const baseTotal = isAuthenticated
-      ? serverCart?.items.reduce((sum, it) => sum + it.product.price * it.quantity, 0) || 0
+
+  // Determine which items and total to display
+  const effectiveItems = isAuthenticated && serverCart
+    ? serverCart.items.map(item => ({ product: item.product, quantity: item.quantity }))
+    : localItems
+  const baseTotal = isAuthenticated && serverCart
+    ? serverCart.total_amount
+    : localTotal
+
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: '',
     companyName: '',
     streetAddress: '',
     apartment: '',
@@ -39,91 +36,41 @@ export default function CheckoutPage() {
     email: '',
     saveInfo: false,
   })
-  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'cod'>('bank')
-  const [couponCode, setCouponCode] = useState('')
-  const [couponApplied, setCouponApplied] = useState(false)
-  const [error, setError] = useState('')
 
-
-  useEffect(() => {
-    if (!isAuthenticated && localItems.length === 0) {
-      router.replace('/cart')
-    }
-  }, [isAuthenticated, localItems.length, router])
-
-  const effectiveItems = isAuthenticated
-    ? serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || []
-    : localItems
-  const baseTotal = isAuthenticated
-    ? serverCart?.total_amount || 0
-    : localTotal
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type, checked } = e.target as HTMLInputElement
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-
-    // Basic required validation
-    if (!formData.firstName || !formData.streetAddress || !formData.city || !formData.phone || !formData.email) {
-      setError('Please fill in all required fields marked with *')
+    // Basic validation
+    const { firstName, streetAddress, city, phone, email } = formData
+    if (!firstName || !streetAddress || !city || !phone || !email) {
+      addToast({ variant: 'error', message: 'Please fill in all required fields.' })
       return
     }
-
+    // Build items payload
+    const itemsPayload = effectiveItems.map(it => ({ product_id: it.product.id, quantity: it.quantity }))
     try {
-      const shipping_address = [
-        `${formData.firstName}${formData.companyName ? `, ${formData.companyName}` : ''}`,
-        formData.streetAddress,
-        formData.apartment ? formData.apartment : undefined,
-        formData.city,
-        `Phone: ${formData.phone}`,
-        `Email: ${formData.email}`,
-      ].filter(Boolean).join('\n')
-
-      const orderData = isAuthenticated
-        ? {
-            shipping_address,
-            // Send server cart items
-            items: serverCart?.items.map(it => ({ product_id: it.product.id, quantity: it.quantity })) || [],
-            payment_method: paymentMethod,
-            coupon_code: couponApplied ? couponCode : undefined,
-          }
-        : {
-            shipping_address,
-            items: localItems.map(item => ({ product_id: item.product.id, quantity: item.quantity })),
-            payment_method: paymentMethod,
-            coupon_code: couponApplied ? couponCode : undefined,
-          }
-
-      const order = await createOrderMutation(orderData).unwrap()
-      if (!isAuthenticated) {
-        dispatch(clearCart())
-      }
-      addToast({ message: 'Order placed successfully', variant: 'success' })
-      router.push(`/orders/${order.id}`)
-    } catch (err) {
-      const message = (err as { data?: { detail?: string } })?.data?.detail ?? 'Failed to create order'
-      setError(message)
-      addToast({ message: message, variant: 'error' })
-    }
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, type } = e.target
-    const value = type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value
-    setFormData((p) => ({ ...p, [name]: value }))
-  }
-
-  const discountAmount = !couponApplied ? 0 : parseFloat((baseTotal * 0.1).toFixed(2))
-  const grandTotal = Math.max(baseTotal - discountAmount, 0)
-
-  const applyCoupon = () => {
-    const code = couponCode.trim().toUpperCase()
-    if (!code) return
-    if (code === 'SAVE10') {
-      setCouponApplied(true)
-      addToast({ message: 'Coupon applied: 10% off', variant: 'success' })
-    } else {
-      setCouponApplied(false)
-      addToast({ message: 'Invalid coupon code', variant: 'error' })
+      await createOrder({
+        shipping_address: [
+          firstName + (formData.companyName ? `, ${formData.companyName}` : ''),
+          streetAddress,
+          formData.apartment || undefined,
+          city,
+          `Phone: ${phone}`,
+          `Email: ${email}`,
+        ].filter(Boolean).join('\n'),
+        items: itemsPayload,
+        payment_method: 'bank',
+        coupon_code: undefined,
+      }).unwrap()
+      if (!isAuthenticated) dispatch(clearCart())
+      addToast({ variant: 'success', message: 'Order placed successfully' })
+      router.push('/orders') // or `/orders/${order.id}` if returned
+    } catch {
+      addToast({ variant: 'error', message: 'Failed to place order' })
     }
   }
 
@@ -139,12 +86,6 @@ export default function CheckoutPage() {
           {/* Billing Details */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-xl font-semibold mb-6">Billing Details</h2>
-
-            {error && (
-              <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-red-800 dark:border-red-800 dark:bg-red-950/60 dark:text-red-100">
-                {error}
-              </div>
-            )}
 
             <form id="checkout-form" onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 gap-5">
@@ -245,27 +186,32 @@ export default function CheckoutPage() {
             <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
             <div className="space-y-4 mb-4">
-              {effectiveItems.map((item) => (
+              {effectiveItems.map(item => (
                 <div key={item.product.id} className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">IMG</div>
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                    IMG
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{item.product.name}</div>
                     <div className="text-xs text-muted-foreground">Qty: {item.quantity}</div>
                   </div>
-                    <div className="text-sm font-medium">${(item.product.price * item.quantity).toFixed(2)}</div>
+                  <div className="text-sm font-medium">${(item.product.price * item.quantity).toFixed(2)}</div>
                 </div>
               ))}
             </div>
 
             <div className="space-y-2 border-t pt-4 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">${baseTotal.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span className="font-medium">Free</span></div>
-              {couponApplied && (
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400"><span>Coupon (SAVE10)</span><span>- ${discountAmount.toFixed(2)}</span></div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">${baseTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="font-medium">Free</span>
+              </div>
               <div className="border-t pt-3 flex justify-between text-base font-semibold">
                 <span>Total</span>
-                <span>${grandTotal.toFixed(2)}</span>
+                <span>${baseTotal.toFixed(2)}</span>
               </div>
             </div>
 
@@ -277,8 +223,8 @@ export default function CheckoutPage() {
                   <input
                     type="radio"
                     name="payment"
-                    checked={paymentMethod === 'bank'}
-                    onChange={() => setPaymentMethod('bank')}
+                    checked={true}
+                    onChange={() => {}}
                     className="h-4 w-4 accent-blue-600"
                   />
                   Bank
@@ -287,31 +233,13 @@ export default function CheckoutPage() {
                   <input
                     type="radio"
                     name="payment"
-                    checked={paymentMethod === 'cod'}
-                    onChange={() => setPaymentMethod('cod')}
+                    checked={false}
+                    onChange={() => {}}
                     className="h-4 w-4 accent-blue-600"
                   />
                   Cash on delivery
                 </label>
               </div>
-            </div>
-
-            {/* Coupon */}
-            <div className="mt-4 flex gap-2">
-              <input
-                type="text"
-                placeholder="Coupon Code"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-                className="flex-1 px-3 py-2 form-input-base form-input-placeholder form-input-focus"
-              />
-              <button
-                type="button"
-                onClick={applyCoupon}
-                className="rounded-md border border-input bg-background px-4 py-2 text-sm hover:bg-accent"
-              >
-                Apply Coupon
-              </button>
             </div>
 
             <div className="pt-4">
