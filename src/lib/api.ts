@@ -792,25 +792,25 @@ export const api = createApi({
       ),
       providesTags: ['Cart'],
     }),
-    getCartItem: builder.query<CartItem, string>({
+  getCartItem: builder.query<ServerCartItem, string>({
       query: (id) => (USE_MOCKS ? `/cart-items/${id}` : `/shop/cart-items/${id}/`),
       providesTags: (result, error, id) => [{ type: 'Cart', id }],
     }),
-    createCartItem: builder.mutation<CartItem, { product_id: string; quantity: number }>({
-    query: (body) => ({
+    createCartItem: builder.mutation<ServerCartItem, { product_id: string; quantity: number }>({
+      query: (body) => ({
         url: USE_MOCKS ? '/cart-items/' : '/shop/cart-items/',
         method: 'POST',
-        // Send product_id and quantity as payload
-         body: { product: body.product_id, quantity: body.quantity },
+        // API expects product_id and quantity
+        body,
       }),
       invalidatesTags: ['Cart'],
     }),
-    updateCartItem: builder.mutation<CartItem, { id: string; data: Partial<{ quantity: number }> }>({
+  updateCartItem: builder.mutation<ServerCartItem, { id: string; data: Partial<{ product_id: string; quantity: number }> }>({
       query: ({ id, data }) => ({
         url: USE_MOCKS ? `/cart-items/${id}/` : `/shop/cart-items/${id}/`,
         method: 'PATCH',
-        // Send only quantity for update
-        body: data,
+    // API expects product_id and/or quantity
+    body: data,
       }),
       invalidatesTags: (res, err, { id }) => [{ type: 'Cart', id }],
     }),
