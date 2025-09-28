@@ -122,13 +122,8 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end">
-                  <Link
-                    href={`/orders/${order.id}`}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
-                  >
-                    View Details
-                  </Link>
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground">Items:</p>
                 </div>
               </div>
             ))}
