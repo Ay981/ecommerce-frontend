@@ -190,7 +190,7 @@ export default function CheckoutPage() {
           <form
             id="checkout-form"
             onSubmit={handleSubmit}
-            className="rounded-xl border border-white/10 bg-white/5 p-6"
+            className="rounded-xl border border-border bg-card p-6 shadow-sm"
           >
             <h2 className="text-lg font-medium text-white">Billing Details</h2>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -200,7 +200,7 @@ export default function CheckoutPage() {
                   required
                   value={form.firstName}
                   onChange={onChange('firstName')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Your first name"
                 />
               </label>
@@ -210,7 +210,7 @@ export default function CheckoutPage() {
                   required
                   value={form.lastName}
                   onChange={onChange('lastName')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Your last name"
                 />
               </label>
@@ -219,7 +219,7 @@ export default function CheckoutPage() {
                 <input
                   value={form.company}
                   onChange={onChange('company')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Optional"
                 />
               </label>
@@ -229,7 +229,7 @@ export default function CheckoutPage() {
                   required
                   value={form.address}
                   onChange={onChange('address')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="House number and street name"
                 />
               </label>
@@ -238,7 +238,7 @@ export default function CheckoutPage() {
                 <input
                   value={form.address2}
                   onChange={onChange('address2')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Optional"
                 />
               </label>
@@ -248,7 +248,7 @@ export default function CheckoutPage() {
                   required
                   value={form.city}
                   onChange={onChange('city')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="City"
                 />
               </label>
@@ -258,7 +258,7 @@ export default function CheckoutPage() {
                   required
                   value={form.phone}
                   onChange={onChange('phone')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="+1 555 000 0000"
                 />
               </label>
@@ -269,7 +269,7 @@ export default function CheckoutPage() {
                   required
                   value={form.email}
                   onChange={onChange('email')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="you@example.com"
                 />
               </label>
@@ -279,14 +279,14 @@ export default function CheckoutPage() {
                   value={form.notes}
                   onChange={onChange('notes')}
                   rows={3}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Add any special instructions"
                 />
               </label>
             </div>
           </form>
-          <aside className="rounded-xl border border-white/10 bg-white/5 p-6">
-            <h2 className="text-lg font-medium text-white">Order Summary</h2>
+          <aside className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-medium text-foreground">Order Summary</h2>
 
             <div className="mt-6 space-y-4">
               <div className="space-y-3">
@@ -312,7 +312,7 @@ export default function CheckoutPage() {
 
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Subtotal</span>
-                <span className="font-medium text-white">{subtotalDisplay}</span>
+                <span className="font-medium text-foreground">{subtotalDisplay}</span>
               </div>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Shipping</span>
@@ -320,9 +320,7 @@ export default function CheckoutPage() {
               </div>
               <div className="flex items-center justify-between border-t border-white/10 pt-4 text-base font-semibold text-white">
                 <span>Total</span>
-                <span>
-                  {isSummaryLoading ? '—' : `$${subtotal.toFixed(2)}`}
-                </span>
+                <span>{isSummaryLoading ? '—' : `$${subtotal.toFixed(2)}`}</span>
               </div>
             </div>
 
@@ -358,7 +356,7 @@ export default function CheckoutPage() {
                 <input
                   value={form.coupon}
                   onChange={onChange('coupon')}
-                  className="rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Enter coupon"
                 />
               </label>

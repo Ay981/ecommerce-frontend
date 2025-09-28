@@ -12,7 +12,19 @@ export default function CartPage() {
   const { isAuthenticated } = useAppSelector((state) => state.auth)
 
   // Fetch server cart items when authenticated
-  const { data: cartResp } = useGetCartItemsQuery({ page: 1, pageSize: 100 }, { skip: !isAuthenticated })
+  const toNumber = (value: unknown) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+    return 0
+  }
+
+  const { data: cartResp, refetch: refetchCart } = useGetCartItemsQuery(
+    { page: 1, pageSize: 100 },
+    { skip: !isAuthenticated, refetchOnMountOrArgChange: true },
+  )
   const [updateCartItem] = useUpdateCartItemMutation()
   const [deleteCartItem] = useDeleteCartItemMutation()
 
@@ -21,7 +33,7 @@ export default function CartPage() {
     ? cartResp?.results.map((it) => ({ product: it.product, quantity: it.quantity, id: it.id })) || []
     : localItems.map((it) => ({ product: it.product, quantity: it.quantity, id: undefined }))
   const total = isAuthenticated
-    ? cartResp?.results.reduce((sum, it) => sum + it.product.price * it.quantity, 0) || 0
+    ? (cartResp?.results ?? []).reduce((sum, it) => sum + toNumber(it.product.price) * it.quantity, 0)
     : localTotal
 
   // Handle quantity changes
@@ -29,14 +41,13 @@ export default function CartPage() {
     if (isAuthenticated && itemId) {
       if (quantity <= 0) {
         await deleteCartItem({ id: itemId }).unwrap()
+        await refetchCart()
         return
       }
       const numericId = Number(productId)
       if (!Number.isFinite(numericId)) return
-      await updateCartItem({
-        id: itemId,
-        data: { product_id: numericId, quantity },
-      }).unwrap()
+      await updateCartItem({ id: itemId, data: { product_id: numericId, quantity } }).unwrap()
+      await refetchCart()
       return
     }
 
@@ -48,9 +59,10 @@ export default function CartPage() {
   }
 
   // Handle item removal
-  const handleRemoveItem = (productId: string, itemId?: string) => {
+  const handleRemoveItem = async (productId: string, itemId?: string) => {
     if (isAuthenticated && itemId) {
-      deleteCartItem({ id: itemId })
+      await deleteCartItem({ id: itemId }).unwrap()
+      await refetchCart()
     } else {
       dispatch(removeItem(productId))
     }
