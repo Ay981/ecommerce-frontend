@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks'
 import { removeItem, updateQuantity } from '@/lib/features/cart/cartSlice'
-import { useGetCartQuery, useUpdateCartItemMutation, useRemoveCartItemMutation } from '@/lib/api'
+import { useGetCartQuery, useUpdateCartItemMutation, useDeleteCartItemMutation } from '@/lib/api'
 import Layout from '@/components/layout/Layout'
 
 export default function CartPage() {
@@ -12,7 +12,7 @@ export default function CartPage() {
   const { isAuthenticated } = useAppSelector(s => s.auth)
   const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
   const [updateCartItem] = useUpdateCartItemMutation()
-  const [removeCartItem] = useRemoveCartItemMutation()
+  const [deleteCartItem] = useDeleteCartItemMutation()
 
   type DisplayItem = { product: typeof localItems[number]['product']; quantity: number; id?: string }
   const items: DisplayItem[] = isAuthenticated
@@ -30,7 +30,7 @@ export default function CartPage() {
 
   const handleRemoveItem = (productId: string, itemId?: string) => {
     if (isAuthenticated && itemId) {
-      removeCartItem({ item_id: itemId })
+      deleteCartItem({ id: itemId })
     } else {
       dispatch(removeItem(productId))
     }
