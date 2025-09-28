@@ -14,7 +14,7 @@ export default function CheckoutPage() {
   const { items: localItems, total: localTotal } = useAppSelector((state) => state.cart)
   const { isAuthenticated } = useAppSelector((state) => state.auth)
   // fetch server cart when authenticated
-  const { data: serverCart } = useGetCartQuery(undefined, { skip: !isAuthenticated })
+  const { data: serverCart, isFetching } = useGetCartQuery(undefined, { skip: !isAuthenticated })
   const [createOrderMutation, { isLoading }] = useCreateOrderMutation()
   const { addToast } = useToast()
   
@@ -55,7 +55,7 @@ export default function CheckoutPage() {
     ? serverCart?.items.map(it => ({ product: it.product, quantity: it.quantity })) || []
     : localItems
   const baseTotal = isAuthenticated
-    ? serverCart?.items.reduce((s, it) => s + it.product.price * it.quantity, 0) || 0
+    ? serverCart?.total_amount || 0
     : localTotal
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +81,7 @@ export default function CheckoutPage() {
       const orderData = isAuthenticated
         ? {
             shipping_address,
-            // Send server cart items
+            // Use server cart items
             items: serverCart?.items.map(it => ({ product_id: it.product.id, quantity: it.quantity })) || [],
             payment_method: paymentMethod,
             coupon_code: couponApplied ? couponCode : undefined,
